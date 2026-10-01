@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Contribua com o Fundo Centenário via Pix pontual ou Pix Automático." />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none';" />
+  <title>Como apoiar | Fundo Centenário</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/site.css" />
+
+  <script defer src="../assets/js/site.js"></script>
+  <script defer src="../assets/js/config.js"></script>
+  <script defer src="../assets/js/pix.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.min.js" crossorigin="anonymous"></script>
+  <script defer src="../assets/js/donation.js"></script>
+</head>
+<body>
+  <header class="site-header header-light" id="siteHeader">
+    <div class="container header-inner">
+      <a class="brand" href="../" aria-label="Fundo Centenário, página inicial">
+        <span class="official-logo-stack">
+          <img class="official-logo official-logo-white" src="../assets/img/logo-horizontal-branco.png" alt="Fundo Centenário" />
+          <img class="official-logo official-logo-blue" src="../assets/img/logo-horizontal-azul.png" alt="" aria-hidden="true" />
+        </span>
+      </a>
+
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="mainNav"><span></span></button>
+      <nav class="nav" id="mainNav" aria-label="Navegação principal">
+        <a href="../#oportunidades">Oportunidades</a>
+        <a href="../#impacto">Impacto</a>
+        <a href="../#como-funciona">Como funciona</a>
+        <a href="../#transparencia">Transparência</a>
+        <a class="button button-primary" href="#contribuir">Contribuir</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="donation-hero">
+      <div class="container">
+        <p class="eyebrow">Como apoiar</p>
+        <h1>Transforme sua contribuição em impacto de longo prazo.</h1>
+        <p class="section-copy">Escolha uma contribuição pontual ou uma recorrência mensal. O site organiza a experiência, enquanto a autenticação e a movimentação financeira permanecem no ambiente bancário.</p>
+      </div>
+    </section>
+
+    <section class="donation-main" id="contribuir">
+      <div class="container donation-layout">
+        <article class="donation-panel">
+          <div class="donation-tabs" role="tablist" aria-label="Tipo de contribuição">
+            <button class="donation-tab active" type="button" role="tab" aria-selected="true" data-donation-tab="once">Doação única via Pix</button>
+            <button class="donation-tab" type="button" role="tab" aria-selected="false" data-donation-tab="automatic">Doação mensal via Pix Automático</button>
+          </div>
+
+          <section class="donation-tab-panel" role="tabpanel" data-donation-panel="once">
+            <p class="eyebrow">Pix pontual</p>
+            <h2>Escolha o valor e gere seu QR Code.</h2>
+            <p>O QR Code é montado localmente no seu navegador. Nenhuma senha, conta bancária ou credencial de pagamento é enviada ao site.</p>
+
+            <div class="donation-form-grid">
+              <div class="field-group">
+                <span class="field-label">Valor da contribuição</span>
+                <div class="amount-options" aria-label="Valores sugeridos">
+                  <button class="amount-button" type="button" data-amount="50">R$ 50</button>
+                  <button class="amount-button active" type="button" data-amount="100">R$ 100</button>
+                  <button class="amount-button" type="button" data-amount="250">R$ 250</button>
+                  <button class="amount-button" type="button" data-amount="500">R$ 500</button>
+                </div>
+                <label class="custom-amount-wrap">
+                  <span class="custom-amount-prefix">R$</span>
+                  <input class="custom-amount" id="customAmount" inputmode="decimal" type="number" min="1" step="0.01" placeholder="Outro valor" aria-label="Outro valor de contribuição" />
+                </label>
+              </div>
+
+              <button class="button button-primary" id="generatePixButton" type="button">Gerar QR Code Pix</button>
+              <p class="status-message" id="pixStatus" aria-live="polite"></p>
+
+              <div class="qr-result">
+                <div class="qr-box" id="qrBox">
+                  <p class="qr-placeholder">O QR Code será exibido aqui depois que a chave Pix oficial for configurada.</p>
+                </div>
+                <div class="qr-details">
+                  <span class="field-label">Contribuição</span>
+                  <h3 id="pixAmountLabel">R$ 100,00</h3>
+                  <p>Escaneie com o aplicativo do seu banco. Antes de confirmar, confira se o recebedor exibido pelo banco corresponde ao Fundo Centenário.</p>
+                  <div class="pix-code-wrap">
+                    <label class="field-label" for="pixCode">Pix Copia e Cola</label>
+                    <textarea class="pix-code" id="pixCode" readonly disabled aria-label="Código Pix Copia e Cola"></textarea>
+                    <div class="inline-actions">
+                      <button class="button button-outline-dark" id="copyPixButton" type="button" disabled>Copiar código Pix</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="donation-tab-panel" role="tabpanel" data-donation-panel="automatic" hidden>
+            <p class="eyebrow">Pix Automático</p>
+            <h2>Autorize uma contribuição recorrente no ambiente do banco.</h2>
+            <p>O site não cria a recorrência diretamente. O botão abaixo redireciona para uma experiência hospedada pelo banco ou PSP, onde a autorização acontece com as regras e autenticação do próprio provedor.</p>
+
+            <div class="field-group utility-mt-28">
+              <span class="field-label">Valor mensal desejado</span>
+              <div class="amount-options" aria-label="Valores mensais sugeridos">
+                <button class="amount-button" type="button" data-amount="50">R$ 50</button>
+                <button class="amount-button active" type="button" data-amount="100">R$ 100</button>
+                <button class="amount-button" type="button" data-amount="250">R$ 250</button>
+                <button class="amount-button" type="button" data-amount="500">R$ 500</button>
+              </div>
+            </div>
+
+            <div class="auto-card">
+              <div class="auto-card-header">
+                <div>
+                  <span class="field-label">Contribuição mensal</span>
+                  <h3 id="autoAmountLabel">R$ 100,00 por mês</h3>
+                  <p>O valor exibido pode ser encaminhado ao provedor somente se a URL hospedada dele documentar esse parâmetro. Caso contrário, o valor final será definido no ambiente bancário.</p>
+                </div>
+                <span class="status-pill" id="autoPill">Configuração pendente</span>
+              </div>
+              <button class="button button-primary full" id="pixAutomaticButton" type="button" disabled>Continuar para o Pix Automático</button>
+              <p class="status-message warning utility-mt-12" id="autoStatus" aria-live="polite"></p>
+            </div>
+          </section>
+        </article>
+
+        <aside class="donation-aside">
+          <p class="eyebrow">Segurança</p>
+          <h2>O banco continua sendo o ambiente de pagamento.</h2>
+          <p>Esta implementação evita processar dados financeiros sensíveis no site do Fundo.</p>
+          <ul class="security-list">
+            <li><span>01</span><div>O Pix pontual é preparado no navegador e confirmado no aplicativo do banco.</div></li>
+            <li><span>02</span><div>O Pix Automático só é iniciado por um redirecionamento para um domínio previamente autorizado do banco ou PSP.</div></li>
+            <li><span>03</span><div>Nenhuma senha, token privado, certificado ou client secret deve existir no JavaScript público.</div></li>
+          </ul>
+          <div class="receiver-check">
+            <span class="field-label text-sky">Confira o recebedor no banco</span>
+            <strong data-receiver-name>Associação Fundo Patrimonial Escola de Engenharia</strong>
+            <p>O nome efetivamente mostrado ao pagador é retornado pelo DICT conforme a chave Pix utilizada.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="donation-note-section">
+      <div class="container">
+        <div class="note-grid">
+          <article class="note-card"><span class="micro-label">Sem backend</span><h3>O site não confirma o pagamento.</h3><p>Após a leitura do QR Code, a transação acontece fora do navegador. Sem uma API e webhook, esta página não sabe se a contribuição foi concluída.</p></article>
+          <article class="note-card"><span class="micro-label">Pix estático</span><h3>Não há credencial bancária no frontend.</h3><p>Para gerar o BR Code são necessários apenas dados públicos do recebedor, como a chave Pix, nome e cidade.</p></article>
+          <article class="note-card"><span class="micro-label">Pix Automático</span><h3>Use fluxo hospedado pelo provedor.</h3><p>Se o banco exigir criação de recorrência via API, OAuth, mTLS ou segredo privado, será necessário adicionar uma função serverless ou backend.</p></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="../" aria-label="Fundo Centenário, página inicial">
+          <span class="official-logo-stack">
+            <img class="official-logo official-logo-white" src="../assets/img/logo-horizontal-branco.png" alt="Fundo Centenário" />
+            <img class="official-logo official-logo-blue" src="../assets/img/logo-horizontal-azul.png" alt="" aria-hidden="true" />
+          </span>
+        </a>
+        <p class="footer-note">O site organiza a experiência de contribuição. A efetivação financeira permanece no banco ou PSP.</p>
+      </div>
+      <div class="footer-column"><strong>Navegação</strong><a href="../">Início</a><a href="../#impacto">Impacto</a><a href="../#transparencia">Transparência</a></div>
+      <div class="footer-column"><strong>Conheça o Fundo</strong><a href="../#como-funciona">Como funciona</a><a href="../#transparencia">Transparência</a></div>
+    </div>
+    <div class="container footer-bottom"><span>© Fundo Centenário · Associação Fundo Patrimonial Escola de Engenharia</span><a href="#contribuir">Voltar à contribuição ↑</a></div>
+  </footer>
+</body>
+</html>

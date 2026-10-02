@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Contribua com o Fundo Centenário por Pix, Pix Automático ou cartão em checkout hospedado pelo PSP." />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';" />
+  <title>Como apoiar | Fundo Centenário</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/site.css" />
+
+  <script defer src="../assets/js/site.js"></script>
+  <script defer src="../assets/js/config.js"></script>
+  <script defer src="../assets/js/donation.js"></script>
+</head>
+<body>
+  <header class="site-header header-light" id="siteHeader">
+    <div class="container header-inner">
+      <a class="brand" href="../" aria-label="Fundo Centenário, página inicial">
+        <span class="official-logo-stack">
+          <img class="official-logo official-logo-white" src="../assets/img/logo-horizontal-branco.png" alt="Fundo Centenário" />
+          <img class="official-logo official-logo-blue" src="../assets/img/logo-horizontal-azul.png" alt="" aria-hidden="true" />
+        </span>
+      </a>
+
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="mainNav"><span></span></button>
+      <nav class="nav" id="mainNav" aria-label="Navegação principal">
+        <a href="../#oportunidades">Oportunidades</a>
+        <a href="../#impacto">Impacto</a>
+        <a href="../#como-funciona">Como funciona</a>
+        <a href="../#transparencia">Transparência</a>
+        <a class="button button-primary" href="#contribuir">Contribuir</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="donation-hero">
+      <div class="container">
+        <p class="eyebrow">Como apoiar</p>
+        <h1>Escolha como você quer fortalecer a Escola de Engenharia.</h1>
+        <p class="section-copy">
+          Escolha o valor e a forma de contribuição. Depois, indique o programa e preencha seus dados para seguir ao pagamento. Os dados do questionário só são gravados após a confirmação do pagamento.
+        </p>
+      </div>
+    </section>
+
+    <section class="donation-main" id="contribuir">
+      <div class="container donation-layout">
+        <article class="donation-panel donation-flow-panel">
+          <div class="donation-progress" aria-label="Etapas da contribuição">
+            <div class="donation-progress-item active" data-progress="contribution" aria-current="step"><span>01</span><strong>Contribuição</strong></div>
+            <div class="donation-progress-item" data-progress="details"><span>02</span><strong>Seus dados</strong></div>
+            <div class="donation-progress-item" data-progress="payment"><span>03</span><strong>Pagamento</strong></div>
+          </div>
+
+          <section class="donation-stage" id="detailsStage">
+            <form id="donationQuestionnaire" novalidate>
+              <div id="contributionStep">
+                <div class="donation-stage-heading">
+                  <p class="eyebrow">Etapa 1 de 3</p>
+                  <h2 tabindex="-1">Como você gostaria de contribuir?</h2>
+                  <p>Escolha o valor e a forma de contribuição para começar.</p>
+                </div>
+                <div class="donation-choice-grid">
+                  <div class="field-group">
+                    <span class="field-label">Valor da contribuição</span>
+                    <div class="amount-options" aria-label="Valores sugeridos">
+                      <button class="amount-button" type="button" data-amount="50">R$ 50</button>
+                      <button class="amount-button active" type="button" data-amount="100">R$ 100</button>
+                      <button class="amount-button" type="button" data-amount="250">R$ 250</button>
+                      <button class="amount-button" type="button" data-amount="500">R$ 500</button>
+                    </div>
+                    <label class="custom-amount-wrap">
+                      <span class="custom-amount-prefix">R$</span>
+                      <input class="custom-amount" id="customAmount" inputmode="decimal" type="number" min="1" max="1000000" step="0.01" placeholder="Outro valor" aria-label="Outro valor de contribuição" />
+                    </label>
+                  </div>
+
+                  <fieldset class="payment-method-fieldset">
+                    <legend>Forma de contribuição</legend>
+                    <div class="payment-method-options">
+                      <label class="payment-method-option selected">
+                        <input type="radio" name="method" value="pix" checked />
+                        <span><strong>Pix pontual</strong><small>QR Code e confirmação automática.</small></span>
+                      </label>
+                      <label class="payment-method-option">
+                        <input type="radio" name="method" value="pix_automatico" />
+                        <span><strong>Pix Automático</strong><small>Autorize a recorrência no banco.</small></span>
+                      </label>
+                      <label class="payment-method-option">
+                        <input type="radio" name="method" value="card" />
+                        <span><strong>Cartão de crédito</strong><small>Checkout hospedado pelo PSP.</small></span>
+                      </label>
+                    </div>
+                  </fieldset>
+                </div>
+
+              </div>
+
+              <fieldset class="donation-details-step" id="donorStep" hidden disabled>
+                <legend class="field-label">Etapa 2 de 3 · Destinação e dados</legend>
+                <div class="donation-stage-heading">
+                  <h2 tabindex="-1">Para onde vai o seu apoio?</h2>
+                  <p id="contributionSummary"></p>
+                </div>
+                <fieldset class="program-fieldset">
+                  <legend>Para qual programa você gostaria de destinar principalmente sua contribuição?</legend>
+                  <p class="field-help">A escolha indica sua preferência principal e ajuda o Fundo a entender o interesse dos doadores.</p>
+                  <div class="program-options">
+                    <label class="program-option">
+                      <input type="radio" name="program" value="edital-projetos" checked />
+                      <span><strong>Edital de projetos</strong><small>Apoio a iniciativas de ensino, pesquisa, extensão, infraestrutura e competições.</small></span>
+                    </label>
+                    <label class="program-option">
+                      <input type="radio" name="program" value="bolsas-permanencia" />
+                      <span><strong>Programa de Bolsas de Permanência</strong><small>Apoio a estudantes em situação de vulnerabilidade.</small></span>
+                    </label>
+                    <label class="program-option">
+                      <input type="radio" name="program" value="mentoria" />
+                      <span><strong>Programa de Mentoria</strong><small>Conexão entre estudantes, alumni e profissionais.</small></span>
+                    </label>
+                    <label class="program-option">
+                      <input type="radio" name="program" value="masterclasses-alumni" />
+                      <span><strong>Masterclasses e conteúdo Alumni</strong><small>Conteúdo, encontros e compartilhamento de trajetórias.</small></span>
+                    </label>
+                    <label class="program-option">
+                      <input type="radio" name="program" value="geral" />
+                      <span><strong>Contribuição geral</strong><small>Permite ao Fundo direcionar os recursos de acordo com suas prioridades.</small></span>
+                    </label>
+                  </div>
+                </fieldset>
+
+                <p class="field-help">Preencha seus dados para identificar a contribuição.</p>
+                <div class="personal-fields">
+                  <label class="form-field">
+                    <span class="field-label">Nome completo</span>
+                    <input id="donorName" name="name" type="text" autocomplete="name" maxlength="120" required placeholder="Seu nome completo" />
+                  </label>
+                  <label class="form-field">
+                    <span class="field-label">E-mail</span>
+                    <input id="donorEmail" name="email" type="email" autocomplete="email" maxlength="254" required placeholder="voce@exemplo.com" />
+                  </label>
+                  <label class="form-field">
+                    <span class="field-label">CPF</span>
+                    <input id="donorCpf" name="cpf" type="text" inputmode="numeric" autocomplete="off" maxlength="14" required placeholder="000.000.000-00" />
+                  </label>
+                </div>
+
+                <label class="privacy-check">
+                  <input id="privacyAcknowledgement" type="checkbox" required />
+                  <span>Estou ciente de que meus dados serão utilizados para identificação, controle interno e comunicações relacionadas à minha contribuição.</span>
+                </label>
+
+                <label class="privacy-check optional">
+                  <input id="communicationOptIn" type="checkbox" />
+                  <span>Quero também receber novidades institucionais, oportunidades e informações sobre o impacto do Fundo.</span>
+                </label>
+
+              </fieldset>
+
+              <p class="status-message error" id="formStatus" aria-live="polite" hidden></p>
+              <div class="donation-form-actions">
+                <button class="button button-outline-dark" id="backToContribution" type="button" hidden>Voltar</button>
+                <button class="button button-primary full contribution-submit" type="submit">Continuar</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="donation-stage" id="paymentStage" hidden>
+            <div class="donation-stage-heading">
+              <p class="eyebrow">Pagamento</p>
+              <h2 id="paymentStageTitle" tabindex="-1">Aguardando pagamento.</h2>
+              <p id="paymentStageCopy">Finalize a contribuição no ambiente indicado abaixo.</p>
+            </div>
+
+            <div id="pixPaymentView" hidden>
+              <div class="qr-result">
+                <div class="qr-box" id="qrBox"><p class="qr-placeholder">Preparando QR Code...</p></div>
+                <div class="qr-details">
+                  <span class="field-label">Valor</span>
+                  <h3 id="pixAmountLabel">R$ 0,00</h3>
+                  <p>Abra o aplicativo do seu banco, escaneie o QR Code e confira o recebedor antes de confirmar.</p>
+                  <div class="pix-code-wrap">
+                    <label class="field-label" for="pixCode">Pix Copia e Cola</label>
+                    <textarea class="pix-code" id="pixCode" readonly aria-label="Código Pix Copia e Cola"></textarea>
+                    <div class="inline-actions">
+                      <button class="button button-outline-dark" id="copyPixButton" type="button">Copiar código Pix</button>
+                      <button class="button button-outline-dark mock-only" id="mockConfirmButton" type="button" hidden>Simular confirmação</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="redirectPaymentView" class="redirect-payment-card" hidden>
+              <div class="redirect-icon" aria-hidden="true">↗</div>
+              <div>
+                <h3 id="redirectTitle">Abrindo ambiente seguro do PSP</h3>
+                <p id="redirectCopy">Os dados de pagamento serão tratados pelo provedor. O Fundo não recebe número do cartão, CVV ou credenciais bancárias.</p>
+              </div>
+              <a class="button button-primary" id="redirectButton" href="#">Continuar no PSP</a>
+            </div>
+
+            <div class="payment-wait-card">
+              <span class="payment-spinner" aria-hidden="true"></span>
+              <div>
+                <strong id="paymentWaitTitle">Aguardando confirmação</strong>
+                <p id="paymentStatusMessage">Assim que o PSP confirmar o pagamento, esta página será atualizada automaticamente.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="donation-stage success-stage" id="successStage" hidden>
+            <div class="success-icon" aria-hidden="true">✓</div>
+            <p class="eyebrow">Contribuição confirmada</p>
+            <h2 id="successTitle" tabindex="-1">Muito obrigado pela sua contribuição!</h2>
+            <p id="successMessage">Seu apoio ajuda o Fundo Centenário a criar oportunidades para estudantes e projetos da Escola de Engenharia.</p>
+            <div class="success-summary">
+              <div><span>Valor</span><strong id="successAmount">R$ 0,00</strong></div>
+              <div><span>Destinação principal</span><strong id="successProgram">Contribuição geral</strong></div>
+            </div>
+            <div class="inline-actions success-actions">
+              <a class="button button-primary" href="../">Voltar para a página inicial</a>
+              <a class="button button-outline-dark" href="../#impacto">Ver impacto do Fundo</a>
+            </div>
+          </section>
+        </article>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <a class="brand" href="../">
+          <span class="official-logo-stack">
+            <img class="official-logo official-logo-white" src="../assets/img/logo-horizontal-branco.png" alt="Fundo Centenário" />
+            <img class="official-logo official-logo-blue" src="../assets/img/logo-horizontal-azul.png" alt="" aria-hidden="true" />
+          </span>
+        </a>
+        <p class="footer-note">Uma construção permanente da comunidade da Escola de Engenharia da UFRGS.</p>
+      </div>
+      <div class="footer-column"><strong>Navegação</strong><a href="../#oportunidades">Oportunidades</a><a href="../#impacto">Impacto</a><a href="../#transparencia">Transparência</a></div>
+      <div class="footer-column"><strong>Participar</strong><a href="#contribuir">Contribuir</a><a href="../#sobre">Sobre o Fundo</a></div>
+    </div>
+  </footer>
+</body>
+</html>

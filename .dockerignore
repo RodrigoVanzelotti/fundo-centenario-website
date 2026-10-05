@@ -1,0 +1,25 @@
+# Somente os arquivos necessários à imagem entram no contexto de build.
+**
+!Dockerfile
+!.dockerignore
+!backend/
+!backend/__init__.py
+!backend/requirements.txt
+!backend/app/
+!backend/app/**
+!backend/templates/
+!backend/templates/**
+!frontend/
+!frontend/**
+
+# Exclusões também valem dentro dos diretórios permitidos.
+**/__pycache__/
+**/*.py[cod]
+**/.env*
+**/*.jsonl
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/.git/
+**/node_modules/

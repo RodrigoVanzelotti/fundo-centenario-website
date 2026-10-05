@@ -92,6 +92,28 @@ http://localhost:8000/como-apoiar/
 
 O `.env.example` vem com `PAYMENT_PROVIDER=mock`. Isso permite testar os três fluxos sem credenciais reais.
 
+## Containers
+
+O `docker-compose.yml` é exclusivo para desenvolvimento local:
+
+```bash
+docker compose up --build
+```
+
+As dependências são instaladas durante o build, e o container inicia diretamente o Uvicorn. O Compose monta o código para recarga automática e usa o PSP mock. Ao alterar `backend/requirements.txt`, reconstrua a imagem. Os dados locais ficam no volume `donation-data`, separado de `backend/data` usado ao executar Python diretamente. `docker compose down` preserva o volume; a opção `--volumes` apaga esses dados. O Compose não carrega `backend/.env` nem habilita emails.
+
+Para produção, construa a imagem na raiz do repositório e publique o artefato no registry utilizado pela infraestrutura:
+
+```bash
+docker build --pull -t fundo-centenario:VERSAO .
+```
+
+O Dockerfile inclui backend, template de email e frontend, roda como UID/GID `10001:10001` e inicia um único worker, sem recarga e sem instalar pacotes no startup. O `.dockerignore` restringe o contexto de build e exclui `.env`, dados JSONL e chaves privadas, conforme as [práticas de build do Docker](https://docs.docker.com/build/building/best-practices/).
+
+No ambiente de produção, injete configurações e segredos em runtime pelo secret manager da plataforma. Configure `PAYMENT_PROVIDER=stripe`, as credenciais documentadas em [INTEGRATION.md](INTEGRATION.md), `PUBLIC_BASE_URL` com HTTPS e `CORS_ORIGINS` com a origem pública. Mantenha `APP_ENV=production` e `ENABLE_MOCK_PSP=false`. A porta interna é `8000`; exponha-a atrás do proxy HTTPS da infraestrutura.
+
+Monte armazenamento persistente privado em `/var/lib/fundo-centenario`, com permissão de escrita para UID/GID `10001:10001`. Não use o filesystem descartável do container para as confirmações e a fila de emails. Execute apenas uma instância com um worker enquanto a persistência for JSONL. Faça backup antes de migrar dados existentes. Use uma tag exclusiva por versão e implante o digest da imagem aprovada; reconstruções podem atualizar a imagem base e dependências transitivas.
+
 ## Testar o Pix local
 
 1. Escolha o valor e Pix pontual; clique em `Continuar`.

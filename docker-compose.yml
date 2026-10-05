@@ -1,10 +1,13 @@
+# Desenvolvimento local apenas. Produção utiliza a imagem construída pelo Dockerfile.
 services:
   web:
-    image: python:3.12-slim
-    working_dir: /app
+    build: .
     volumes:
-      - ./:/app
-    command: sh -c "pip install --no-cache-dir -r backend/requirements.txt && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"
+      - ./backend/app:/app/backend/app:ro
+      - ./backend/templates:/app/backend/templates:ro
+      - ./frontend:/app/frontend:ro
+      - donation-data:/var/lib/fundo-centenario
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/backend/app --no-access-log
     environment:
       APP_ENV: development
       APP_HOST: 0.0.0.0
@@ -13,6 +16,10 @@ services:
       SERVE_FRONTEND: "true"
       PAYMENT_PROVIDER: mock
       ENABLE_MOCK_PSP: "true"
-      DATA_DIR: /app/backend/data
+      EMAIL_ENABLED: "false"
+      DATA_DIR: /var/lib/fundo-centenario
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
+
+volumes:
+  donation-data:

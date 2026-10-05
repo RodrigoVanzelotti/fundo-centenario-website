@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Contribua com o Fundo Centenário por Pix, Pix Automático ou cartão em checkout hospedado pelo PSP." />
+  <meta name="description" content="Contribua com o Fundo Centenário por Pix ou cartão, com opção de contribuição mensal em checkout seguro." />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';" />
   <title>Como apoiar | Fundo Centenário</title>
 
@@ -94,6 +94,10 @@
                       <label class="payment-method-option">
                         <input type="radio" name="method" value="card" />
                         <span><strong>Cartão de crédito</strong><small>Checkout hospedado pelo PSP.</small></span>
+                      </label>
+                      <label class="payment-method-option" hidden>
+                        <input type="radio" name="method" value="card_recurring" disabled />
+                        <span><strong>Contribuição mensal no cartão</strong><small>O valor escolhido será cobrado todo mês. Autorize no checkout seguro.</small></span>
                       </label>
                     </div>
                   </fieldset>

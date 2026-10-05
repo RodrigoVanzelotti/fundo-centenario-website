@@ -1,71 +1,115 @@
-# Segurança da implementação estática
+# Segurança e privacidade
 
-## Modelo de ameaça principal
+Este projeto trata pagamentos e informações pessoais. O código reduz o escopo de risco, mas a publicação em produção ainda exige revisão de segurança, privacidade e operação.
 
-No Pix pontual, o site não recebe senha nem dados bancários do doador. O principal risco passa a ser a adulteração do próprio site para substituir a chave Pix ou o destino do Pix Automático.
+## O que nunca deve existir no frontend
 
-## Recomendações mínimas de produção
+- `client_secret`;
+- API key secreta;
+- token Bearer privado;
+- certificado ou chave privada;
+- senha bancária;
+- segredo de webhook;
+- número de cartão;
+- CVV;
+- validade do cartão.
 
-### Hospedagem
+Esses dados devem ficar no backend/secret manager.
 
-- HTTPS obrigatório;
-- MFA nas contas de hospedagem e repositório;
-- acesso de deploy limitado;
-- branch protection no repositório;
-- revisão de mudanças em `assets/js/config.js`;
-- domínio e DNS protegidos por MFA.
+## Questionário
 
-### Dependências
+O formulário coleta:
 
-A página usa `qrcode-generator@2.0.4` apenas para desenhar o QR Code.
+- nome;
+- e-mail;
+- CPF;
+- preferência de destinação;
+- autorização opcional para comunicações institucionais.
 
-Em produção, prefira servir uma cópia revisada localmente. Assim, a política pode evoluir para `script-src 'self'` e eliminar a execução de JavaScript de terceiros.
+O arquivo `backend/data/confirmed_donations.jsonl` contém PII e recebe permissão `0600` quando possível.
 
-### Content Security Policy
+Ele **não deve**:
 
-A página `/como-apoiar/` já contém uma CSP compatível com o protótipo atual, permitindo scripts próprios e a versão fixada do jsDelivr.
+- ficar dentro de `frontend/`;
+- ser versionado no Git;
+- ser disponibilizado por Nginx/Apache/StaticFiles;
+- ser copiado para buckets públicos;
+- aparecer em logs de aplicação.
 
-Ao vendorizar a biblioteca de QR, use uma política mais restrita no servidor:
+## Regra de gravação
 
-```text
-Content-Security-Policy:
-  default-src 'self';
-  script-src 'self';
-  style-src 'self' https://fonts.googleapis.com;
-  font-src https://fonts.gstatic.com;
-  img-src 'self' data:;
-  connect-src 'none';
-  object-src 'none';
-  base-uri 'self';
-  frame-ancestors 'none';
-```
+O questionário não é escrito em disco enquanto o pagamento está pendente.
 
-Observação: `frame-ancestors` deve ser enviado como header HTTP para proteção completa; não dependa apenas de uma meta tag.
+A confirmação de pagamento é registrada separadamente em `payment_confirmations.jsonl` sem nome, e-mail ou CPF. Isso serve para idempotência e recuperação do fluxo.
 
-### Pix Automático
+## HTTPS
 
-- use somente HTTPS;
-- mantenha uma allowlist de domínios do PSP em `allowedHosts`;
-- não construa URLs com domínios vindos de parâmetros do usuário;
-- não aceite uma URL de redirecionamento informada por query string;
-- nunca exponha tokens ou certificados.
+Em produção, force HTTPS para:
 
-### Conferência pelo doador
+- site;
+- API;
+- `return_url`;
+- `webhook_url`;
+- PSP.
 
-A interface orienta o usuário a conferir no aplicativo do banco o nome do recebedor antes de autorizar a transação.
+Não transmita CPF em HTTP.
 
-Essa etapa é importante porque o nome efetivamente exibido pelo app é obtido a partir da chave Pix no DICT.
+## Webhooks
 
-## Limitações conhecidas
+### Stripe
 
-Sem backend, não há:
+O adapter valida o corpo bruto com HMAC-SHA256 sobre `timestamp.corpo`, aceita apenas assinaturas `v1` e exige timestamp dentro de 300 segundos do relógio local, incluindo rejeição de timestamps futuros fora dessa janela. Também verifica modo test/live e versão da API. O endpoint limita o corpo a 1 MiB. Configure NTP e o segredo do endpoint correto; não envie payloads completos ou cabeçalhos de autenticação aos logs.
 
-- confirmação automática de pagamento;
-- webhook;
-- conciliação automática;
-- emissão de recibo;
-- painel de doações;
-- proteção contra alguém pagar o mesmo QR mais de uma vez;
-- criação de recorrência via API privada.
+Recorrência só é confirmada por `invoice.payment_succeeded`, com status `paid`, saldo restante zero, valor contratado e moeda BRL. Conclusão do Checkout, autorização, retorno do navegador e `invoice.paid` não comprovam o pagamento mensal. Metadata recebida deve corresponder ao token, método, programa e valor da contribuição conhecida; renovações devem pertencer à mesma assinatura.
 
-Essas limitações são intencionais no MVP estático.
+O ID da fatura deduplica as cobranças mensais em disco. Falhas de gravação não impedem uma nova tentativa do webhook. Arquivos novos são criados com modo `0600` nos sistemas que o suportam, e erros detectados de escrita são revertidos. Arquivos JSONL corrompidos impedem a inicialização em vez de serem silenciosamente ignorados. Configure ACLs equivalentes no Windows e mantenha backups restritos.
+
+`DATA_DIR` dentro da pasta pública do frontend é rejeitado. Nome/e-mail/CPF permanecem apenas na memória pendente e são escritos no cadastro confirmado após pagamento. O ledger de renovações não contém esses campos. A Stripe coleta os dados de pagamento exclusivamente no Checkout; a aplicação não envia o questionário em metadata ou parâmetros de URL. Respostas de erro da API Stripe não são repassadas ao frontend.
+
+Esta persistência suporta um processo/worker; locks locais não coordenam múltiplos processos. Antes de escalar, use transações e chaves únicas em banco para faturas e contribuições, e considere processamento por fila. O token de consulta continua sendo uma credencial de sessão no navegador; não o coloque em analytics, URLs ou logs. Histórico pago não equivale a assinatura ainda ativa.
+
+Nunca aceite o status enviado pelo navegador como prova de pagamento.
+
+A prova deve vir do PSP e passar por:
+
+1. verificação criptográfica da assinatura;
+2. validação de identificador/referência externa;
+3. validação do status;
+4. idempotência;
+5. quando possível, validação de valor e moeda.
+
+O `generic_http` contém HMAC-SHA256 apenas como implementação genérica. Adapte para o algoritmo oficial do PSP.
+
+## Cartão
+
+O projeto usa checkout hospedado. Isso reduz o escopo de dados de cartão, mas não elimina automaticamente todas as obrigações PCI DSS da organização. Confirme o modelo de integração e o escopo aplicável com o PSP e a equipe responsável.
+
+## CPF e minimização
+
+CPF é dado pessoal. Antes de produção, documente por que ele é necessário, quem terá acesso, prazo de retenção, forma de exclusão e a base jurídica aplicável ao tratamento.
+
+Se o CPF não for necessário para controle, comprovante, obrigações contábeis/fiscais ou outra finalidade definida, considere removê-lo por minimização de dados.
+
+## Agradecimentos por email
+
+Credenciais SMTP ficam somente no `.env`/secret manager do backend. STARTTLS ou TLS desde a conexão inicial são obrigatórios, com validação de certificado e hostname; autenticação ocorre somente após TLS. Não habilite debug SMTP, pois ele pode expor credenciais, destinatários e conteúdo. Logs de falhas registram apenas a classe da exceção.
+
+O HTML escapa os parâmetros interpolados. Headers e endereços são construídos com `EmailMessage`/`Address`; o assunto não aceita quebras de linha. O email inclui nome, valor, causa e forma de contribuição, sem CPF, tokens ou dados de cartão. Links para atividades não incluem informações do doador. O template fica no backend, não há endpoint público para enviar mensagens arbitrárias e nenhum email é enviado por redirects ou autorização de assinatura.
+
+A fila contém referências opacas e só é preenchida após confirmação validada. O worker exige o cadastro confirmado e revalida a referência de pagamento antes de enviar. Tentativas de recuperação sem pagamento ou token correto não criam emails. O processamento SMTP ocorre fora do webhook e do lock de pagamentos; sua indisponibilidade não desfaz nem bloqueia a confirmação.
+
+O agradecimento é transacional e não altera o opt-in de comunicações institucionais. O sender recebe nome, endereço e o conteúdo transacional; configure retenção e acesso no serviço contratado. O registro local de aceitação evita reenvios normais, mas SMTP e gravação em disco não são uma transação única: uma interrupção entre ambos pode produzir duplicata. O worker suporta somente um processo, como a persistência atual.
+
+## Recomendações de infraestrutura
+
+- MFA para contas de deploy e PSP;
+- secrets em secret manager, não em `.env` no servidor quando houver opção melhor;
+- usuário de processo sem privilégios;
+- rate limiting para criação de intents;
+- WAF/reverse proxy;
+- logs sem PII;
+- backup criptografado do arquivo confirmado;
+- acesso ao arquivo restrito à equipe autorizada;
+- monitoramento de webhooks rejeitados;
+- política de retenção e descarte;
+- revisão periódica das dependências.

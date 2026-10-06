@@ -1,0 +1,70 @@
+name: CI
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHON_DOTENV_DISABLED: '1'
+      FIRESTORE_TEST_HOST: 127.0.0.1:8085
+      REQUIRE_FIRESTORE_TESTS: '1'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Install locked runtime and test tools
+        run: |
+          python -m pip install --require-hashes -r backend/requirements.lock
+          python -m pip install -r backend/requirements-dev.txt
+          python -m pip check
+          python tools/lock_requirements.py --check
+      - name: Audit runtime dependencies
+        run: pip-audit --disable-pip --no-deps -r backend/requirements.lock
+      - name: Start isolated Firestore emulator
+        run: |
+          docker run -d --name firestore -p 127.0.0.1:8085:8085 gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators@sha256:8d8573471c489a409f03891d2c24d177fa531276184f7002b9a2d853d1b3ed54 gcloud emulators firestore start --host-port=0.0.0.0:8085 --project=demo-fundo-centenario
+          for _ in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:8085/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:8085/ >/dev/null
+      - name: Backend and frontend checks
+        run: |
+          python -m pytest -q
+          node tests/frontend-static.test.js
+          node tests/donation-steps.test.js
+          docker compose config --quiet
+          git diff --check
+      - name: Build and smoke test container
+        run: |
+          docker build --platform linux/amd64 -t fundo:ci .
+          docker run -d --name fundo -p 127.0.0.1:8000:8000 -e APP_ENV=development -e STORAGE_BACKEND=local -e PAYMENT_PROVIDER=mock -e ENABLE_MOCK_PSP=true -e EMAIL_ENABLED=false fundo:ci
+          for _ in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8000/api/health >/dev/null; then break; fi
+            sleep 1
+          done
+          python tools/smoke.py http://127.0.0.1:8000
+          docker exec fundo python -c "import os; from pathlib import Path; assert os.getuid()==10001; assert not list(Path('/app').rglob('.env*')); assert not list(Path('/app').rglob('*.jsonl'))"
+      - name: Scan container packages
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.75.0
+          image-ref: fundo:ci
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f fundo firestore 2>/dev/null || true

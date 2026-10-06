@@ -1,0 +1,123 @@
+name: Deploy Cloud Run
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [staging, production]
+        default: staging
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+  deploy:
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+    concurrency:
+      group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+      PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+      REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY }}
+      RUNTIME_SA: ${{ vars.RUNTIME_SERVICE_ACCOUNT }}
+      PUBLIC_URL: ${{ vars.PUBLIC_BASE_URL }}
+      RUN_URL: ${{ vars.CLOUD_RUN_URL }}
+      SCHEDULER_SA: ${{ vars.SCHEDULER_SERVICE_ACCOUNT }}
+      EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED }}
+      SMTP_HOST: ${{ vars.SMTP_HOST }}
+      EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
+      EMAIL_REPLY_TO: ${{ vars.EMAIL_REPLY_TO }}
+      STRIPE_SECRET_VERSION: ${{ vars.STRIPE_SECRET_VERSION || '1' }}
+      STRIPE_WEBHOOK_SECRET_VERSION: ${{ vars.STRIPE_WEBHOOK_SECRET_VERSION || '1' }}
+      SMTP_SECRET_VERSION: ${{ vars.SMTP_SECRET_VERSION || '1' }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Authenticate using short-lived identity
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+      - name: Validate configuration and existing service
+        shell: bash
+        run: |
+          for name in PROJECT REGION SERVICE REPOSITORY RUNTIME_SA PUBLIC_URL RUN_URL SCHEDULER_SA EMAIL_ENABLED; do
+            test -n "${!name}" || { echo "Missing environment variable: $name"; exit 1; }
+          done
+          test "$EMAIL_ENABLED" = true -o "$EMAIL_ENABLED" = false
+          for name in STRIPE_SECRET_VERSION STRIPE_WEBHOOK_SECRET_VERSION SMTP_SECRET_VERSION; do
+            [[ "${!name}" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid secret version: $name"; exit 1; }
+          done
+          gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" >/dev/null
+      - name: Build, test and publish the same image
+        shell: bash
+        run: |
+          IMAGE="$REGION-docker.pkg.dev/$PROJECT/$REPOSITORY/fundo:$GITHUB_SHA-$GITHUB_RUN_ID"
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker build --platform linux/amd64 -t "$IMAGE" .
+          docker run -d --name fundo -p 127.0.0.1:8000:8000 -e APP_ENV=development -e STORAGE_BACKEND=local -e PAYMENT_PROVIDER=mock -e ENABLE_MOCK_PSP=true -e EMAIL_ENABLED=false "$IMAGE"
+          for _ in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8000/api/health >/dev/null; then break; fi
+            sleep 1
+          done
+          python tools/smoke.py http://127.0.0.1:8000
+          docker rm -f fundo
+          docker push "$IMAGE"
+          DIGEST_IMAGE="$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE")"
+          echo "DIGEST_IMAGE=$DIGEST_IMAGE" >> "$GITHUB_ENV"
+      - name: Deploy candidate without production traffic
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json,os
+          env={
+            'APP_ENV':os.environ['DEPLOY_ENV'],'STORAGE_BACKEND':'firestore',
+            'GOOGLE_CLOUD_PROJECT':os.environ['PROJECT'],'FIRESTORE_DATABASE':'(default)','FIRESTORE_PREFIX':'fundo_',
+            'PAYMENT_PROVIDER':'stripe','ENABLE_MOCK_PSP':'false',
+            'STRIPE_LIVE_MODE':'true' if os.environ['DEPLOY_ENV']=='production' else 'false',
+            'PUBLIC_BASE_URL':os.environ['PUBLIC_URL'],'CORS_ORIGINS':os.environ['PUBLIC_URL'],
+            'EMAIL_ENABLED':os.environ['EMAIL_ENABLED'],'SMTP_HOST':os.environ['SMTP_HOST'],
+            'SMTP_PORT':'587','SMTP_SECURITY':'starttls','EMAIL_FROM_ADDRESS':os.environ['EMAIL_FROM_ADDRESS'],
+            'EMAIL_REPLY_TO':os.environ['EMAIL_REPLY_TO'],'SCHEDULER_AUDIENCE':os.environ['RUN_URL'],
+            'SCHEDULER_SERVICE_ACCOUNT':os.environ['SCHEDULER_SA'],'INTENT_LIMIT_PER_MINUTE':'60','EMAIL_BATCH_SIZE':'10',
+          }
+          with open('/tmp/fundo-env.json','w') as file: json.dump(env,file)
+          PY
+          SECRET_REFS="STRIPE_SECRET_KEY=stripe-secret-key:$STRIPE_SECRET_VERSION,STRIPE_WEBHOOK_SECRET=stripe-webhook-secret:$STRIPE_WEBHOOK_SECRET_VERSION"
+          if [ "$EMAIL_ENABLED" = true ]; then
+            SECRET_REFS="$SECRET_REFS,SMTP_USERNAME=smtp-username:$SMTP_SECRET_VERSION,SMTP_PASSWORD=smtp-password:$SMTP_SECRET_VERSION"
+          fi
+          gcloud run deploy "$SERVICE" --project "$PROJECT" --region "$REGION" --image "$DIGEST_IMAGE" --service-account "$RUNTIME_SA" --port 8000 --memory 512Mi --cpu 1 --concurrency 20 --min-instances 0 --max-instances 3 --timeout 180 --no-traffic --tag candidate --env-vars-file /tmp/fundo-env.json --set-secrets "$SECRET_REFS" --quiet
+          gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format=json > /tmp/fundo-service.json
+          python - <<'PY'
+          import json,os
+          with open('/tmp/fundo-service.json') as file: service=json.load(file)
+          candidate=next(entry for entry in service['status']['traffic'] if entry.get('tag')=='candidate')
+          with open(os.environ['GITHUB_ENV'],'a') as file:
+            file.write('CANDIDATE_URL='+candidate['url']+'\n')
+            file.write('REVISION='+candidate['revisionName']+'\n')
+          PY
+      - name: Check candidate and promote
+        shell: bash
+        run: |
+          python tools/smoke.py "$CANDIDATE_URL" --production
+          gcloud run services update-traffic "$SERVICE" --project "$PROJECT" --region "$REGION" --to-revisions "$REVISION=100" --quiet
+          echo "Deployed revision: $REVISION" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: $DIGEST_IMAGE" >> "$GITHUB_STEP_SUMMARY"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import asyncio
+import logging
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from .providers.generic_http import GenericHttpPaymentProvider
 from .providers.mock import MockPaymentProvider
 from .providers.stripe import StripePaymentProvider
 from .services import PaymentService
+from .scheduler_auth import verify_scheduler
 
 
 def build_provider():
@@ -29,19 +31,23 @@ def build_provider():
     raise RuntimeError(f"PAYMENT_PROVIDER desconhecido: {settings.payment_provider}")
 
 
+settings.validate_runtime()
 provider = build_provider()
 service = PaymentService(settings, provider)
 
 
 async def email_worker() -> None:
     while True:
-        await run_in_threadpool(service.process_pending_emails)
+        try:
+            await run_in_threadpool(service.process_pending_emails)
+        except Exception as exc:
+            logging.getLogger(__name__).warning("Falha no worker local (%s).", type(exc).__name__)
         await asyncio.sleep(30)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(email_worker()) if settings.email_enabled else None
+    task = asyncio.create_task(email_worker()) if settings.email_enabled and settings.storage_backend == "local" else None
     try:
         yield
     finally:
@@ -56,8 +62,42 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/api/docs" if settings.app_env != "production" else None,
     redoc_url=None,
+    openapi_url=None if settings.app_env in {"production", "staging"} else "/openapi.json",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def request_security(request: Request, call_next):
+    if request.method in {"POST", "PUT", "PATCH"}:
+        limit = 1_048_576 if request.url.path.startswith("/api/webhooks/") else 32_768
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > limit:
+                return JSONResponse({"detail": "Requisição excede o tamanho permitido."}, status_code=413)
+        request._body = bytes(body)
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        # Never log request bodies or SDK exceptions that may contain credentials/PII.
+        logging.getLogger(__name__).error("Requisição falhou (%s).", type(exc).__name__)
+        response = JSONResponse({"detail": "Serviço temporariamente indisponível."}, status_code=503)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if settings.app_env in {"production", "staging"}:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    if "text/html" in response.headers.get("content-type", "") and not request.url.path.startswith("/mock-psp/"):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
+            "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; "
+            "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        )
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 if settings.cors_origins:
     app.add_middleware(
@@ -65,7 +105,7 @@ if settings.cors_origins:
         allow_origins=settings.cors_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type", "X-Donation-Token"],
+        allow_headers=["Content-Type", "X-Donation-Token", "X-Idempotency-Key"],
     )
 
 
@@ -74,9 +114,24 @@ def health() -> dict[str, str]:
     return {"status": "ok", "provider": provider.name}
 
 
+@app.get("/api/ready")
+def ready() -> dict[str, str]:
+    if service.repository:
+        service.payment_confirmations.contains("readiness-probe")
+    return {"status": "ok"}
+
+
 @app.post("/api/donations/intents", response_model=DonationIntentResponse, status_code=status.HTTP_201_CREATED)
-async def create_donation_intent(payload: DonationIntentRequest) -> DonationIntentResponse:
-    return await service.create_intent(payload)
+async def create_donation_intent(payload: DonationIntentRequest, x_idempotency_key: str | None = Header(None)) -> DonationIntentResponse:
+    if not await run_in_threadpool(service.allow_intent):
+        raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde um minuto.", headers={"Retry-After": "60"})
+    return await service.create_intent(payload, x_idempotency_key)
+
+
+@app.post("/api/internal/emails/process")
+def process_emails(authorization: str = Header("")) -> dict[str, int]:
+    verify_scheduler(authorization, settings)
+    return service.process_pending_emails()
 
 
 @app.get("/api/donations/options", response_model=DonationOptionsResponse)

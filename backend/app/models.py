@@ -101,7 +101,7 @@ class DonationStatusResponse(BaseModel):
 class PendingDonation(BaseModel):
     donation_id: str
     status_token_hash: str
-    donor: DonorQuestionnaire
+    donor: DonorQuestionnaire | None = None
     program: DonationProgram
     method: PaymentMethod
     amount_cents: int

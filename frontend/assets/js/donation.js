@@ -34,6 +34,7 @@
   let selectedAmount = Number(config?.donation?.defaultAmount || 100);
   let activeSession = readSession();
   let pollTimer = null;
+  let polling = false;
   let mockConfirmUrl = null;
 
   function formatBRL(value) {
@@ -231,8 +232,14 @@
       amount_cents: Math.round(selectedAmount * 100),
     };
 
+    const fingerprint = JSON.stringify([payload.amount_cents, payload.method, payload.program]);
+    if (activeSession?.fingerprint !== fingerprint) clearSession();
+    const idempotencyKey = activeSession?.idempotency_key || crypto.randomUUID();
+    writeSession({ donor, fingerprint, idempotency_key: idempotencyKey });
+
     const response = await api("/api/donations/intents", {
       method: "POST",
+      headers: { "X-Idempotency-Key": idempotencyKey },
       body: JSON.stringify(payload),
     });
 
@@ -244,6 +251,8 @@
       donation_id: response.donation_id,
       status_token: response.status_token,
       program_label: response.program_label,
+      payment: response,
+      saved_at: Date.now(),
     });
 
     showStage("payment");
@@ -321,8 +330,8 @@
   }
 
   async function showSuccess(statusData) {
-    stopPolling();
     const finalStatus = await finalizeIfNecessary(statusData);
+    stopPolling();
     const donorFirstName = firstName(activeSession?.donor?.name);
     $("#successTitle").textContent = donorFirstName
       ? `Muito obrigado, ${donorFirstName}! Sua contribuição foi confirmada.`
@@ -338,6 +347,8 @@
   }
 
   async function pollOnce() {
+    if (polling) return;
+    polling = true;
     try {
       const statusData = await getStatus();
       if (!statusData) return;
@@ -347,6 +358,8 @@
       }
     } catch (error) {
       paymentStatusMessage.textContent = error.message || "Não foi possível consultar o pagamento agora. Tentaremos novamente.";
+    } finally {
+      polling = false;
     }
   }
 
@@ -364,8 +377,8 @@
   async function restoreReturnFlow() {
     const url = new URL(window.location.href);
     const donationId = url.searchParams.get("donation_id");
-    if (!donationId) return false;
-    if (!activeSession?.status_token || activeSession.donation_id !== donationId) {
+    if (!donationId && !activeSession?.donation_id) return false;
+    if (!activeSession?.status_token || (donationId && activeSession.donation_id !== donationId)) {
       setFormError("O PSP retornou ao site, mas esta sessão não possui os dados necessários para consultar a contribuição. Se o pagamento foi concluído, entre em contato com o Fundo informando a referência exibida pelo PSP.");
       url.searchParams.delete("donation_id");
       history.replaceState({}, "", url.pathname + url.search + url.hash);
@@ -376,6 +389,13 @@
     redirectPaymentView.hidden = true;
     $("#paymentStageTitle").textContent = "Verificando sua contribuição...";
     $("#paymentStageCopy").textContent = "Estamos consultando a confirmação recebida do PSP.";
+    if (!donationId && activeSession.payment) {
+      renderPayment({ ...activeSession.payment, redirect_url: null });
+      if (activeSession.payment.redirect_url) {
+        redirectPaymentView.hidden = false;
+        redirectButton.href = activeSession.payment.redirect_url;
+      }
+    }
     await pollOnce();
     if (!successStage.hidden) return true;
     startPolling();

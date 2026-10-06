@@ -4,7 +4,7 @@
 
 O adapter `backend/app/providers/stripe.py` usa a API oficial via `httpx`, já instalado. O fluxo mensal cria um Checkout hospedado em `mode=subscription`, em BRL, com preço escolhido pelo doador e intervalo `month`. A Stripe realiza as cobranças seguintes; este backend não agenda débitos nem recebe dados de cartão.
 
-Configure **somente no backend/.env**:
+Configure no backend (Secret Manager em produção; `.env` apenas local):
 
 ```env
 PAYMENT_PROVIDER=stripe
@@ -63,7 +63,7 @@ Cobranças seguintes, tentativas de recuperação, mudança de cartão e cancela
 
 Assinaturas já existentes na conta Stripe não são automaticamente vinculadas ao cadastro local. Eventos sem a metadata desta aplicação são ignorados para não atribuir pagamentos a doadores incorretos. Uma migração deve reconciliar as referências existentes antes de adicionar metadata; a implementação não modifica assinaturas antigas nem o `.env` atual.
 
-Para produção, use chaves e segredo do endpoint live, `STRIPE_LIVE_MODE=true` e `PUBLIC_BASE_URL` HTTPS. Esta integração usa arquivos locais e **um único processo/worker**; antes de usar múltiplos workers ou instâncias, substitua a persistência por transações e restrições únicas em banco. Não habilite múltiplos workers sobre os mesmos JSONL.
+Produção exige Firestore, chaves/endpoint live, `STRIPE_LIVE_MODE=true` e origem HTTPS. Confirmação, fatura e outbox são transacionais. Staging aceita Stripe test; JSONL é exclusivo de desenvolvimento e exige um processo. Consulte [DEPLOYMENT.md](DEPLOYMENT.md) para configuração, migração e Scheduler.
 
 Referências oficiais: [Checkout Sessions](https://docs.stripe.com/api/checkout/sessions/create), [metadata](https://docs.stripe.com/metadata), [webhooks e assinatura](https://docs.stripe.com/webhooks), [tipos de eventos](https://docs.stripe.com/api/events/types), [versionamento](https://docs.stripe.com/api/versioning).
 
@@ -289,7 +289,7 @@ payment_confirmations.jsonl (sem PII do questionário)
 
 # 6. Confiabilidade do questionário pendente
 
-Para cumprir a regra de não gravar PII antes do pagamento, os dados pendentes ficam somente em memória no backend e em `sessionStorage` no navegador.
+Para cumprir a regra de não gravar PII antes do pagamento, o questionário fica em `sessionStorage`. No modo local há também uma cópia em memória no backend; no Firestore a intenção exclui o questionário. A perda da sessão do navegador ainda exige recuperação administrativa da identificação, independentemente de reinício do backend.
 
 Há um mecanismo de recuperação:
 

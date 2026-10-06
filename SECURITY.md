@@ -64,9 +64,9 @@ Recorrência só é confirmada por `invoice.payment_succeeded`, com status `paid
 
 O ID da fatura deduplica as cobranças mensais em disco. Falhas de gravação não impedem uma nova tentativa do webhook. Arquivos novos são criados com modo `0600` nos sistemas que o suportam, e erros detectados de escrita são revertidos. Arquivos JSONL corrompidos impedem a inicialização em vez de serem silenciosamente ignorados. Configure ACLs equivalentes no Windows e mantenha backups restritos.
 
-`DATA_DIR` dentro da pasta pública do frontend é rejeitado. Nome/e-mail/CPF permanecem apenas na memória pendente e são escritos no cadastro confirmado após pagamento. O ledger de renovações não contém esses campos. A Stripe coleta os dados de pagamento exclusivamente no Checkout; a aplicação não envia o questionário em metadata ou parâmetros de URL. Respostas de erro da API Stripe não são repassadas ao frontend.
+`DATA_DIR` dentro da pasta pública do frontend é rejeitado. No modo local, nome/e-mail/CPF permanecem apenas na memória pendente; no Firestore, permanecem na sessão do navegador até `/finalize`. São escritos no cadastro confirmado somente após pagamento. O ledger de renovações não contém esses campos. A Stripe coleta os dados de pagamento exclusivamente no Checkout; a aplicação não envia o questionário em metadata ou parâmetros de URL. Respostas de erro da API Stripe não são repassadas ao frontend.
 
-Esta persistência suporta um processo/worker; locks locais não coordenam múltiplos processos. Antes de escalar, use transações e chaves únicas em banco para faturas e contribuições, e considere processamento por fila. O token de consulta continua sendo uma credencial de sessão no navegador; não o coloque em analytics, URLs ou logs. Histórico pago não equivale a assinatura ainda ativa.
+O modo JSONL local suporta um processo/worker. Produção usa Firestore: confirmação, fatura e outbox são transacionais, e a reserva de emails coordena instâncias distintas. Intenções não contêm questionário; `/finalize` revalida confirmação e token antes do cadastro. Firebase nega clientes; o backend usa IAM. Tokens são credenciais de sessão e não devem aparecer em analytics, URLs ou logs. Histórico pago não equivale a assinatura ativa.
 
 Nunca aceite o status enviado pelo navegador como prova de pagamento.
 
@@ -98,7 +98,7 @@ O HTML escapa os parâmetros interpolados. Headers e endereços são construído
 
 A fila contém referências opacas e só é preenchida após confirmação validada. O worker exige o cadastro confirmado e revalida a referência de pagamento antes de enviar. Tentativas de recuperação sem pagamento ou token correto não criam emails. O processamento SMTP ocorre fora do webhook e do lock de pagamentos; sua indisponibilidade não desfaz nem bloqueia a confirmação.
 
-O agradecimento é transacional e não altera o opt-in de comunicações institucionais. O sender recebe nome, endereço e o conteúdo transacional; configure retenção e acesso no serviço contratado. O registro local de aceitação evita reenvios normais, mas SMTP e gravação em disco não são uma transação única: uma interrupção entre ambos pode produzir duplicata. O worker suporta somente um processo, como a persistência atual.
+O agradecimento é transacional e não altera o opt-in de novidades. Configure retenção e acesso no remetente. SMTP e registro de aceitação não são uma transação única: uma interrupção pode produzir duplicata. O worker local exige um processo. Em produção, Scheduler chama uma rota com verificação OIDC de audience e identidade, e a outbox usa lease transacional expirável.
 
 ## Recomendações de infraestrutura
 
@@ -113,3 +113,11 @@ O agradecimento é transacional e não altera o opt-in de comunicações institu
 - monitoramento de webhooks rejeitados;
 - política de retenção e descarte;
 - revisão periódica das dependências.
+
+## Deploy e fronteiras de confiança
+
+Consulte [DEPLOYMENT.md](DEPLOYMENT.md). Produção exige Firestore e Stripe live; staging aceita Stripe test. Configurações incompatíveis falham na inicialização, e arquivos de chave/emulator são rejeitados nesses ambientes. Segredos são injetados por versão numérica. O CI usa WIF/OIDC restrito, sem chave Google de longa duração.
+
+API não é cacheável. HTML recebe CSP por header, nosniff, Referrer-Policy e Permissions-Policy. Requisições são limitadas a 32 KiB, exceto webhooks (1 MiB). Falhas inesperadas registram apenas a classe da exceção e retornam erro genérico. Não configure captura de bodies/tokens na infraestrutura.
+
+A criação exige UUID de idempotência em staging/produção. Essa credencial opaca é distinta da referência pública da contribuição e não deve aparecer em logs/analytics. O registro contém token e resposta PSP, sem questionário, e exige acesso restrito. Retries reutilizam a referência no PSP; tentativas antigas sem resposta não criam cobrança automaticamente.

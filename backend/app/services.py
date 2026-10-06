@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
+from starlette.concurrency import run_in_threadpool
 
 from .config import Settings
 from .emailer import DonationEmailSender
@@ -30,27 +31,80 @@ from .storage import ConfirmedDonationStore, JsonlStore, PaymentConfirmationStor
 
 
 class PaymentService:
-    def __init__(self, settings: Settings, provider: PaymentProvider):
+    def __init__(self, settings: Settings, provider: PaymentProvider, repository=None):
         if settings.data_dir.resolve().is_relative_to(settings.frontend_dir.resolve()):
             raise ValueError("DATA_DIR deve permanecer fora da pasta pública do frontend.")
         self.settings = settings
         self.provider = provider
-        self.pending = PendingDonationStore()
-        self.payment_confirmations = PaymentConfirmationStore(settings.data_dir / "payment_confirmations.jsonl")
-        self.confirmed_donations = ConfirmedDonationStore(settings.data_dir / "confirmed_donations.jsonl")
-        self.recurring_payments = JsonlStore(settings.data_dir / "recurring_payments.jsonl", "provider_payment_id")
+        self.repository = repository
+        if settings.storage_backend == "firestore" and repository is None:
+            from .firestore_storage import FirestoreRepository
+            self.repository = FirestoreRepository(settings)
         self.email_sender = DonationEmailSender(settings)
-        self.email_outbox = JsonlStore(settings.data_dir / "thank_you_outbox.jsonl", "provider_payment_id")
-        self.email_sent = JsonlStore(settings.data_dir / "thank_you_sent.jsonl", "provider_payment_id")
+        if self.repository:
+            self.pending = self.repository.pending
+            self.payment_confirmations = self.repository.confirmations
+            self.confirmed_donations = self.repository.donors
+            self.recurring_payments = self.repository.payments
+            self.email_outbox = self.repository.outbox
+            self.email_sent = self.repository.sent
+        else:
+            self.pending = PendingDonationStore()
+            self.payment_confirmations = PaymentConfirmationStore(settings.data_dir / "payment_confirmations.jsonl")
+            self.confirmed_donations = ConfirmedDonationStore(settings.data_dir / "confirmed_donations.jsonl")
+            self.recurring_payments = JsonlStore(settings.data_dir / "recurring_payments.jsonl", "provider_payment_id")
+            self.email_outbox = JsonlStore(settings.data_dir / "thank_you_outbox.jsonl", "provider_payment_id")
+            self.email_sent = JsonlStore(settings.data_dir / "thank_you_sent.jsonl", "provider_payment_id")
+        self._intents: dict[str, dict] = {}
+        self._intent_budget = (0, 0)
         self._email_lock = threading.Lock()
         # ponytail: local files and one process; use database transactions before adding workers.
         self._event_lock = threading.Lock()
 
-    async def create_intent(self, payload: DonationIntentRequest) -> DonationIntentResponse:
+    def allow_intent(self) -> bool:
+        if self.repository:
+            return self.repository.allow_intent(self.settings.intent_limit_per_minute)
+        with self._event_lock:
+            minute, count = self._intent_budget
+            now = int(time.time() // 60)
+            count = count if minute == now else 0
+            self._intent_budget = (now, count + 1)
+            return count < self.settings.intent_limit_per_minute
+
+    def _reserve_intent(self, key: str, payload: DonationIntentRequest):
+        proposed = {"key": key, "donation_id": str(uuid.uuid4()), "token": new_status_token(),
+                    "amount_cents": payload.amount_cents, "program": payload.program.value,
+                    "method": payload.method.value, "created_at_epoch": time.time(), "response": None}
+        if self.repository:
+            record = self.repository.reserve_intent(key, proposed)
+        else:
+            with self._event_lock:
+                # ponytail: local development cache; durable idempotency uses Firestore in production.
+                self._intents = {k: v for k, v in self._intents.items() if time.time() - v["created_at_epoch"] < 86400}
+                record = self._intents.setdefault(key, proposed)
+        if any(record[field] != proposed[field] for field in ("amount_cents", "program", "method")):
+            raise HTTPException(status_code=409, detail="Esta tentativa já foi associada a outra contribuição. Inicie uma nova tentativa.")
+        if not record["response"] and time.time() - record["created_at_epoch"] >= 23 * 3600:
+            raise HTTPException(status_code=409, detail="Tentativa antiga sem resposta. Consulte o Fundo antes de criar outra cobrança.")
+        return record
+
+    async def create_intent(self, payload: DonationIntentRequest, idempotency_key: str | None = None) -> DonationIntentResponse:
         if payload.method not in self.provider.supported_methods:
             raise HTTPException(status_code=422, detail="Forma de contribuição indisponível.")
-        donation_id = str(uuid.uuid4())
-        token = new_status_token()
+        if idempotency_key is not None:
+            try:
+                if str(uuid.UUID(idempotency_key)) != idempotency_key:
+                    raise ValueError()
+            except ValueError:
+                raise HTTPException(status_code=422, detail="X-Idempotency-Key deve ser um UUID canônico.") from None
+        elif self.settings.app_env in {"production", "staging"}:
+            raise HTTPException(status_code=422, detail="Informe X-Idempotency-Key.")
+        key = idempotency_key or str(uuid.uuid4())
+        intent = await run_in_threadpool(self._reserve_intent, key, payload)
+        if intent["response"]:
+            return DonationIntentResponse.model_validate(intent["response"])
+        donation_id = intent["donation_id"]
+        token = intent["token"]
         token_hash = hash_token(token)
 
         return_url = f"{self.settings.public_base_url}/como-apoiar/?donation_id={donation_id}"
@@ -95,9 +149,9 @@ class PaymentService:
             provider_status=result.status,
             expires_at_epoch=time.time() + self.settings.pending_ttl_seconds,
         )
-        self.pending.put(pending)
+        await run_in_threadpool(self.pending.put, pending)
 
-        return DonationIntentResponse(
+        response = DonationIntentResponse(
             donation_id=donation_id,
             status_token=token,
             method=payload.method,
@@ -111,6 +165,11 @@ class PaymentService:
             expires_at=result.expires_at,
             mock_confirm_url=result.mock_confirm_url,
         )
+        if self.repository:
+            await run_in_threadpool(self.repository.save_intent, key, response.model_dump(mode="json"))
+        else:
+            intent["response"] = response.model_dump(mode="json")
+        return response
 
     def _verify_access(self, donation_id: str, token: str) -> tuple[PendingDonation | None, PaymentConfirmation | None]:
         token_hash = hash_token(token)
@@ -170,7 +229,7 @@ class PaymentService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook inválido.") from exc
         if event is not None:
             try:
-                self.apply_provider_event(event)
+                await run_in_threadpool(self.apply_provider_event, event)
             except (ValueError, TypeError) as exc:
                 raise HTTPException(status_code=400, detail="Webhook incompatível com a contribuição.") from exc
         return event
@@ -222,11 +281,14 @@ class PaymentService:
             )
             # Durable object IDs deduplicate redeliveries and distinct events for the same invoice.
             # Do not mark an event processed before both writes succeed: Stripe must be able to retry.
-            self.payment_confirmations.append_once(confirmation.model_dump())
-            if confirmation.provider_subscription_id:
-                self.recurring_payments.append_once(confirmation.model_dump())
-            self._queue_thank_you(confirmation)
-            if pending:
+            if self.repository:
+                self.repository.confirm(confirmation)
+            else:
+                self.payment_confirmations.append_once(confirmation.model_dump())
+                if confirmation.provider_subscription_id:
+                    self.recurring_payments.append_once(confirmation.model_dump())
+                self._queue_thank_you(confirmation)
+            if pending and pending.donor:
                 self._persist_questionnaire(pending, existing or confirmation)
 
     def _persist_questionnaire(self, pending: PendingDonation, confirmation: PaymentConfirmation) -> bool:
@@ -249,37 +311,64 @@ class PaymentService:
         return written
 
     def _queue_thank_you(self, confirmation: PaymentConfirmation) -> None:
+        if self.repository:
+            self.repository.enqueue(confirmation)
+            return
         if self.settings.email_enabled:
             self.email_outbox.append_once({
                 "donation_id": confirmation.donation_id,
                 "provider_payment_id": confirmation.provider_payment_id,
             })
 
-    def process_pending_emails(self) -> None:
+    def process_pending_emails(self) -> dict[str, int]:
+        counts = {"sent": 0, "deferred": 0}
         if not self.settings.email_enabled:
-            return
+            return counts
         # ponytail: one worker scans the local outbox; use a transactional queue when volume grows.
         with self._email_lock:
-            for job in self.email_outbox.records():
+            jobs = self.repository.due_jobs(self.settings.email_batch_size) if self.repository else self.email_outbox.records()
+            started = time.monotonic()
+            for job in jobs:
+                if time.monotonic() - started > 50:
+                    break
                 payment_id = job["provider_payment_id"]
-                if self.email_sent.contains(payment_id):
+                lease = str(uuid.uuid4())
+                if self.repository and not self.repository.claim(payment_id, lease):
                     continue
-                confirmation = self.payment_confirmations.get_model(job["donation_id"])
-                donor = self.confirmed_donations.get_model(job["donation_id"])
-                if not confirmation or not donor:
-                    continue
-                payment = confirmation.model_dump() if confirmation.provider_payment_id == payment_id else self.recurring_payments.get(payment_id)
-                if not payment or payment["donation_id"] != donor.donation_id:
-                    continue
+                smtp_accepted = False
                 try:
+                    if self.email_sent.contains(payment_id):
+                        if self.repository:
+                            self.repository.finish_job(job, lease, True)
+                        continue
+                    confirmation = self.payment_confirmations.get_model(job["donation_id"])
+                    donor = self.confirmed_donations.get_model(job["donation_id"])
+                    payment = (confirmation.model_dump() if confirmation and confirmation.provider_payment_id == payment_id
+                               else self.recurring_payments.get(payment_id))
+                    if not confirmation or not donor or not payment or payment["donation_id"] != donor.donation_id:
+                        if self.repository:
+                            self.repository.finish_job(job, lease, False)
+                        counts["deferred"] += 1
+                        continue
                     # ponytail: SMTP acceptance and the local marker are not atomic; provider idempotency closes this gap.
                     self.email_sender.send(donor, payment["amount_cents"], payment_id)
-                    self.email_sent.append_once({
-                        **job, "sent_at": datetime.now(timezone.utc).isoformat(),
-                    })
+                    smtp_accepted = True
+                    if self.repository:
+                        self.repository.finish_job(job, lease, True)
+                    else:
+                        self.email_sent.append_once({**job, "sent_at": datetime.now(timezone.utc).isoformat()})
+                    counts["sent"] += 1
                 except Exception as exc:
                     # SMTP errors can echo recipients and credentials. Log only the exception class.
                     logging.getLogger(__name__).warning("Agradecimento pendente: falha de envio ou registro (%s).", type(exc).__name__)
+                    counts["deferred"] += 1
+                    if self.repository and not smtp_accepted:
+                        try:
+                            self.repository.finish_job(job, lease, False)
+                        except Exception as retry_error:
+                            logging.getLogger(__name__).warning("Falha ao reagendar agradecimento (%s).", type(retry_error).__name__)
+                    # Keep the lease on unexpected failures; after expiry another request may retry.
+        return counts
 
     def finalize_after_restart(self, donation_id: str, token: str, payload: DonationFinalizeRequest) -> DonationStatusResponse:
         confirmation = self.payment_confirmations.get_model(donation_id)
@@ -303,7 +392,10 @@ class PaymentService:
                 created_at=confirmation.confirmed_at,
                 confirmed_at=confirmation.confirmed_at,
             )
-            self.confirmed_donations.append_once(record.model_dump())
+            if self.repository:
+                self.repository.finalize(record, hash_token(token))
+            else:
+                self.confirmed_donations.append_once(record.model_dump())
 
         self._queue_thank_you(confirmation)
         return self.get_status(donation_id, token)

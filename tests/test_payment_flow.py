@@ -88,6 +88,7 @@ def test_signed_webhook_rejects_invalid_signature_and_persists_once(tmp_path):
 
     settings = make_settings(tmp_path)
     settings.psp_webhook_secret = "test-only-webhook-secret"
+    settings.psp_base_url = "https://psp.example.com"
     service = PaymentService(settings, MockPaymentProvider(settings))
     payload = DonationIntentRequest(
         donor=DonorQuestionnaire(

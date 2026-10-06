@@ -63,11 +63,17 @@ Programas disponíveis:
 
 ### Regra de persistência
 
-O questionário chega ao backend para iniciar a cobrança, mas fica somente em memória enquanto o pagamento está pendente.
+No modo local, o questionário fica somente em memória enquanto o pagamento está pendente. No Firestore, ele não é mantido na intenção: permanece na sessão do navegador até a finalização após confirmação.
 
 `confirmed_donations.jsonl` só recebe o registro depois de uma confirmação `paid` válida do PSP.
 
 O backend mantém também `payment_confirmations.jsonl`, que não contém nome, e-mail nem CPF. Ele permite recuperar o fluxo se o processo reiniciar entre o pagamento e a gravação final do questionário.
+
+## Produção: Cloud Run e Firestore
+
+A aplicação está preparada para persistência externa no Firestore e CI/CD pelo GitHub Actions. O procedimento completo de Google Cloud, Firebase, identidades, segredos, primeiro deploy, Scheduler, migração e rollback está em [DEPLOYMENT.md](DEPLOYMENT.md). Produção rejeita mock e JSONL local; staging usa Firestore com Stripe test. Frontend e API continuam na mesma imagem e origem.
+
+Em produção, intenções guardam somente dados de pagamento e autenticação, sem nome/email/CPF. O cadastro é enviado pelo navegador a `/finalize` depois da confirmação validada. Confirmações, faturas e pedidos de email são gravados em transação; o Scheduler processa uma outbox com leases e retries, sem depender de um worker permanente.
 
 ## Rodar localmente
 
@@ -78,7 +84,7 @@ cd fundo-centenario-payments
 python -m venv .venv
 source .venv/bin/activate        # Linux/macOS
 # .venv\Scripts\activate         # Windows PowerShell
-pip install -r backend/requirements.txt
+pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 cp backend/.env.example backend/.env
 uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -110,9 +116,9 @@ docker build --pull -t fundo-centenario:VERSAO .
 
 O Dockerfile inclui backend, template de email e frontend, roda como UID/GID `10001:10001` e inicia um único worker, sem recarga e sem instalar pacotes no startup. O `.dockerignore` restringe o contexto de build e exclui `.env`, dados JSONL e chaves privadas, conforme as [práticas de build do Docker](https://docs.docker.com/build/building/best-practices/).
 
-No ambiente de produção, injete configurações e segredos em runtime pelo secret manager da plataforma. Configure `PAYMENT_PROVIDER=stripe`, as credenciais documentadas em [INTEGRATION.md](INTEGRATION.md), `PUBLIC_BASE_URL` com HTTPS e `CORS_ORIGINS` com a origem pública. Mantenha `APP_ENV=production` e `ENABLE_MOCK_PSP=false`. A porta interna é `8000`; exponha-a atrás do proxy HTTPS da infraestrutura.
+No ambiente de produção, injete configurações e segredos em runtime pelo Secret Manager. Configure Stripe e a origem pública conforme [DEPLOYMENT.md](DEPLOYMENT.md). A porta é definida por `PORT`, com fallback local `8000`; TLS é terminado pela plataforma.
 
-Monte armazenamento persistente privado em `/var/lib/fundo-centenario`, com permissão de escrita para UID/GID `10001:10001`. Não use o filesystem descartável do container para as confirmações e a fila de emails. Execute apenas uma instância com um worker enquanto a persistência for JSONL. Faça backup antes de migrar dados existentes. Use uma tag exclusiva por versão e implante o digest da imagem aprovada; reconstruções podem atualizar a imagem base e dependências transitivas.
+No Cloud Run, use `STORAGE_BACKEND=firestore`, com projeto, identidade e banco privado. Não monte JSONL como persistência de produção. A imagem usa lock com hashes e base fixada por digest; o workflow implanta uma imagem testada por digest. Dados locais existentes exigem migração explícita e reconciliação.
 
 ## Testar o Pix local
 
@@ -164,11 +170,11 @@ Para TLS desde a conexão inicial, use `SMTP_SECURITY=ssl` e a porta indicada pe
 
 `EMAIL_TEMPLATE_PATH` vazio seleciona o template padrão; um caminho personalizado é resolvido a partir do diretório em que o backend é iniciado. `EMAIL_THANK_YOU_TEXT` personaliza o agradecimento e o convite para conhecer as atividades. `EMAIL_ACTIVITY_URL` vazio aponta para `PUBLIC_BASE_URL/#impacto`; em produção, configure uma URL pública HTTPS.
 
-A fila é persistida em `thank_you_outbox.jsonl` e processada em uma thread fora do webhook, a cada 30 segundos com o backend em execução. Falhas SMTP ficam pendentes para nova tentativa, inclusive após reinício. Não há conexão SMTP na criação da cobrança, na autorização da assinatura ou antes da confirmação; o envio também aguarda os dados confirmados quando houver recuperação via `/finalize`.
+No modo local, a fila é persistida em `thank_you_outbox.jsonl` e processada em uma thread fora do webhook a cada 30 segundos. No Firestore, ela é processada pelo endpoint OIDC do Scheduler, com reserva transacional; não há loop permanente. Falhas ficam pendentes para retry, inclusive após reinício. O envio exige pagamento e cadastro confirmados, inclusive após `/finalize`.
 
 Cada pagamento gera um pedido de envio. Na recorrência, cada fatura efetivamente paga recebe seu próprio agradecimento. Webhooks repetidos não criam novos pedidos, e `thank_you_sent.jsonl` evita repetir emails já aceitos pelo SMTP. Assinaturas e doações antigas não são varridas para disparo retroativo. Com `EMAIL_ENABLED=false`, nenhum novo pedido é criado e a fila existente não é processada.
 
-SMTP não garante entrega exatamente uma vez: se o servidor aceitar o email e o processo parar antes de registrar o envio, uma nova tentativa pode duplicá-lo. O `Message-ID` permanece o mesmo para ajudar na deduplicação. A confirmação SMTP também não garante chegada à caixa de entrada. A persistência e o worker continuam exigindo um único processo; para eliminar essa janela, use um serviço com chave de idempotência e persistência transacional.
+SMTP não garante entrega exatamente uma vez: se aceitar o email e o processo parar antes do registro, o retry pode duplicá-lo. O `Message-ID` permanece estável. Aceitação SMTP não comprova entrega na caixa de entrada. A persistência local exige um processo; Firestore coordena instâncias distintas, mas não torna SMTP e banco uma transação única. Para eliminar essa janela, use um serviço de email com idempotência.
 
 O agradecimento é relativo ao pagamento, independentemente do opt-in de novidades; ele não cadastra o doador em uma lista de divulgação. SMTP utiliza [smtplib da biblioteca padrão](https://docs.python.org/3/library/smtplib.html), sem dependências adicionais.
 

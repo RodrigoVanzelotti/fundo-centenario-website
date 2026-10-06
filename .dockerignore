@@ -5,6 +5,7 @@
 !backend/
 !backend/__init__.py
 !backend/requirements.txt
+!backend/requirements.lock
 !backend/app/
 !backend/app/**
 !backend/templates/

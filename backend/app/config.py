@@ -3,17 +3,22 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+if os.getenv("APP_ENV") != "production" and os.getenv("PYTHON_DOTENV_DISABLED") != "1":
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 def _bool(name: str, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
         return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+    normalized = value.strip().lower()
+    if normalized not in {"1", "true", "yes", "on", "0", "false", "no", "off"}:
+        raise ValueError(f"Configuração booleana inválida: {name}.")
+    return normalized in {"1", "true", "yes", "on"}
 
 
 def _list(name: str, default: str = "") -> list[str]:
@@ -31,6 +36,14 @@ class Settings:
     data_dir: Path = Path(os.getenv("DATA_DIR", str(Path(__file__).resolve().parents[1] / "data"))).resolve()
     serve_frontend: bool = _bool("SERVE_FRONTEND", True)
     cors_origins: list[str] = field(default_factory=lambda: _list("CORS_ORIGINS", "http://localhost:8000"))
+    storage_backend: str = os.getenv("STORAGE_BACKEND", "local")
+    google_cloud_project: str = os.getenv("GOOGLE_CLOUD_PROJECT", "")
+    firestore_database: str = os.getenv("FIRESTORE_DATABASE", "(default)")
+    firestore_prefix: str = os.getenv("FIRESTORE_PREFIX", "fundo_")
+    intent_limit_per_minute: int = int(os.getenv("INTENT_LIMIT_PER_MINUTE", "60"))
+    scheduler_audience: str = os.getenv("SCHEDULER_AUDIENCE", "")
+    scheduler_service_account: str = os.getenv("SCHEDULER_SERVICE_ACCOUNT", "")
+    email_batch_size: int = int(os.getenv("EMAIL_BATCH_SIZE", "10"))
 
     payment_provider: str = os.getenv("PAYMENT_PROVIDER", "mock").strip().lower()
     pending_ttl_seconds: int = int(os.getenv("PENDING_TTL_SECONDS", str(30 * 24 * 60 * 60)))
@@ -96,6 +109,33 @@ class Settings:
     psp_paid_statuses: list[str] = field(default_factory=lambda: _list("PSP_PAID_STATUSES", "paid,confirmed,approved,completed"))
     psp_authorized_statuses: list[str] = field(default_factory=lambda: _list("PSP_AUTHORIZED_STATUSES", "authorized,active"))
     psp_failed_statuses: list[str] = field(default_factory=lambda: _list("PSP_FAILED_STATUSES", "failed,rejected,cancelled,canceled,expired"))
+
+    def validate_runtime(self) -> None:
+        if self.app_env not in {"development", "test", "staging", "production"}:
+            raise ValueError("APP_ENV inválido.")
+        if self.storage_backend not in {"local", "firestore"}:
+            raise ValueError("STORAGE_BACKEND inválido.")
+        if not 1 <= self.intent_limit_per_minute <= 10000 or not 1 <= self.email_batch_size <= 20:
+            raise ValueError("Limites de requisições/email inválidos.")
+        if self.storage_backend == "firestore" and not self.google_cloud_project:
+            raise ValueError("Configure GOOGLE_CLOUD_PROJECT.")
+        if not self.firestore_prefix or not self.firestore_prefix.replace("_", "").isalnum():
+            raise ValueError("FIRESTORE_PREFIX inválido.")
+        if self.app_env not in {"production", "staging"}:
+            return
+        url = urlsplit(self.public_base_url)
+        if url.scheme != "https" or not url.hostname or url.username or url.password or url.path or url.query or url.fragment:
+            raise ValueError("PUBLIC_BASE_URL deve ser uma origem HTTPS.")
+        if self.payment_provider != "stripe" or self.enable_mock_psp or self.storage_backend != "firestore":
+            raise ValueError("Produção/staging exige Stripe, Firestore e mock desabilitado.")
+        if self.app_env == "production" and not self.stripe_live_mode:
+            raise ValueError("Produção exige STRIPE_LIVE_MODE=true; use staging para testes Stripe.")
+        if os.getenv("FIRESTORE_EMULATOR_HOST") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+            raise ValueError("Produção/staging deve usar a identidade do serviço, sem emulator ou arquivo de chave.")
+        if any(origin != self.public_base_url for origin in self.cors_origins):
+            raise ValueError("CORS_ORIGINS deve corresponder à origem pública.")
+        if self.email_enabled and (not self.scheduler_service_account or urlsplit(self.scheduler_audience).scheme != "https"):
+            raise ValueError("Configure a identidade e audience HTTPS do Scheduler.")
 
 
 settings = Settings()

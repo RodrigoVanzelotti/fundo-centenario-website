@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "fundo_thank_you_outbox",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "state", "order": "ASCENDING" },
+        { "fieldPath": "next_attempt_at", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "fundo_pending", "fieldPath": "expires_at", "ttl": true, "indexes": [] },
+    { "collectionGroup": "fundo_rate_limits", "fieldPath": "expires_at", "ttl": true, "indexes": [] },
+    { "collectionGroup": "fundo_confirmed_donations", "fieldPath": "donor_name", "indexes": [] },
+    { "collectionGroup": "fundo_confirmed_donations", "fieldPath": "donor_email", "indexes": [] },
+    { "collectionGroup": "fundo_confirmed_donations", "fieldPath": "donor_cpf", "indexes": [] },
+    { "collectionGroup": "fundo_intents", "fieldPath": "token", "indexes": [] },
+    { "collectionGroup": "fundo_intents", "fieldPath": "response", "indexes": [] }
+  ]
+}

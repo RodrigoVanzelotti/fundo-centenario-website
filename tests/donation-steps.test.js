@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const crypto = require('node:crypto').webcrypto;
 
 const html = fs.readFileSync('frontend/como-apoiar/index.html', 'utf8');
 assert.match(html, /id="donorStep" hidden disabled/);
@@ -9,7 +10,7 @@ assert(!html.includes('??'));
 assert(html.indexOf('id="customAmount"') < html.indexOf('id="donorStep"'));
 assert(html.indexOf('name="program"') < html.indexOf('id="donorName"'));
 
-async function check(method, missingReturnSession = false, optionsFailure = false) {
+async function check(method, missingReturnSession = false, optionsFailure = false, restoreLocal = false) {
   const nodes = new Map();
   const node = (selector) => {
     if (!nodes.has(selector)) nodes.set(selector, {
@@ -44,23 +45,33 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
   const windowListeners = {};
   let restoredUrl = null;
   let status = 'pending';
+  let failFinalize = false;
+  let persisted = true;
+  let clearedTimers = 0;
   let failIntent = true;
   vm.runInNewContext(fs.readFileSync('frontend/assets/js/donation.js', 'utf8'), {
+    crypto,
     document: { querySelector: node, querySelectorAll: selector => selector === '.payment-method-option' ? methodOptions : [], hidden: false },
     window: {
       location: { href: `https://example.com/como-apoiar/${missingReturnSession ? '?donation_id=old&keep=1#contribuir' : ''}`, assign(url) { requests.push({ redirect: url }); } },
       addEventListener(type, callback) { windowListeners[type] = callback; },
-      scrollTo() {}, setInterval(callback) { timers.push(callback); return 1; }, clearInterval() {},
+      scrollTo() {}, setInterval(callback) { timers.push(callback); return 1; }, clearInterval() { clearedTimers++; },
     },
-    sessionStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+    sessionStorage: {
+      getItem() { return restoreLocal ? JSON.stringify({ donation_id: 'test', status_token: 'token',
+        donor: { name: 'Test Donor' }, payment: { method, amount_cents: 25000, pix_copy_paste: method === 'pix' ? 'pix-code' : null,
+          redirect_url: method === 'pix' ? null : 'https://example.com/checkout' } }) : null; },
+      setItem() {}, removeItem() {},
+    },
     history: { replaceState(state, title, url) { restoredUrl = url; } }, URL, Intl, setTimeout(callback) { callback(); },
     async fetch(url, options) {
       requests.push({ url, options });
       if (url.endsWith('/options')) return { ok: !optionsFailure, json: async () => ({ methods: method === 'pix_automatico' ? radios.map(radio => radio.value) : ['pix', 'card', 'card_recurring'] }) };
       if (url.endsWith('/intents') && failIntent) return { ok: false, json: async () => ({ detail: 'Try again' }) };
+      if (url.endsWith('/finalize') && failFinalize) return { ok: false, json: async () => ({ detail: 'Temporary finalize failure' }) };
       return { ok: true, json: async () => ({
         donation_id: 'test', status_token: 'token', method, amount_cents: 25000,
-        program_label: 'General', status, persisted: status === 'paid',
+        program_label: 'General', status, persisted: status === 'paid' && persisted,
         pix_copy_paste: method === 'pix' ? 'pix-code' : null,
         redirect_url: method === 'pix' ? null : 'https://example.com/checkout',
       }) };
@@ -68,6 +79,15 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
   });
   // Options are fetched asynchronously before the form can create a payment.
   await new Promise(resolve => setImmediate(resolve));
+  if (restoreLocal) {
+    assert.equal(node('#paymentStage').hidden, false);
+    assert(requests.some(request => request.url?.endsWith('/status')));
+    assert(!requests.some(request => request.url?.endsWith('/intents')));
+    assert(!requests.some(request => request.redirect)); // Reload must not force another PSP redirect.
+    if (method === 'pix') assert.equal(node('#pixCode').value, 'pix-code');
+    else assert.equal(node('#redirectButton').href, 'https://example.com/checkout');
+    return;
+  }
   if (optionsFailure) {
     assert.equal(node('#submit').disabled, true);
     assert.equal(node('#formStatus').hidden, false);
@@ -127,6 +147,7 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
   await submit(); // Double submission must not create another intent.
   await creating;
   assert.equal(requests.filter(r => r.url?.endsWith('/intents')).length, 2);
+  assert.equal(intentRequests()[0].options.headers['X-Idempotency-Key'], intentRequests()[1].options.headers['X-Idempotency-Key']);
   const payload = JSON.parse(requests.findLast(r => r.url?.endsWith('/intents')).options.body);
   assert.equal(payload.amount_cents, 25000);
   assert.equal(payload.method, method);
@@ -134,7 +155,15 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
   assert.equal(node('#successStage').hidden, true);
   if (method === 'pix') assert.equal(node('#pixCode').value, 'pix-code');
   else assert(requests.some(r => r.redirect === 'https://example.com/checkout'));
+  await new Promise(resolve => setImmediate(resolve));
   status = 'paid';
+  persisted = false;
+  failFinalize = true;
+  const previouslyCleared = clearedTimers;
+  await timers[0]();
+  assert.equal(node('#successStage').hidden, true);
+  assert.equal(clearedTimers, previouslyCleared); // Failed finalization must keep polling active.
+  failFinalize = false;
   await timers[0]();
   assert.equal(node('#successStage').hidden, false);
 }
@@ -143,5 +172,7 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
   for (const method of ['pix', 'pix_automatico', 'card', 'card_recurring']) await check(method);
   await check('pix', true);
   await check('card_recurring', false, true);
+  await check('pix', false, false, true);
+  await check('card_recurring', false, false, true);
   console.log('donation steps: ok');
 })().catch(error => { console.error(error); process.exitCode = 1; });

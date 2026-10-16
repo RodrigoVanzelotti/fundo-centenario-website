@@ -14,12 +14,12 @@ from fastapi import HTTPException
 from backend.app.config import Settings, _bool
 from backend.app.models import DonationFinalizeRequest, DonationIntentRequest
 from backend.app.providers.base import ProviderWebhookEvent
-from backend.app.providers.mock import MockPaymentProvider
+from backend.app.providers.stripe import StripePaymentProvider
 from backend.app.services import PaymentService
 
 
 @pytest.fixture
-def cloud(monkeypatch, tmp_path):
+def cloud(monkeypatch, tmp_path, stripe_http):
     host = os.getenv("FIRESTORE_TEST_HOST")
     if not host:
         if os.getenv("REQUIRE_FIRESTORE_TESTS") == "1":
@@ -32,7 +32,7 @@ def cloud(monkeypatch, tmp_path):
                         firestore_prefix="test_" + uuid.uuid4().hex + "_", data_dir=tmp_path,
                         public_base_url="http://testserver", email_enabled=False)
     repository = FirestoreRepository(settings)
-    provider = MockPaymentProvider(settings)
+    provider = StripePaymentProvider(settings)
     service = PaymentService(settings, provider, repository)
     payload = DonationIntentRequest(donor={"name": "Synthetic Donor", "email": "donor@example.com", "cpf": "52998224725"},
                                     method="card_recurring", program="geral", amount_cents=10000)
@@ -204,13 +204,11 @@ def test_signed_stripe_webhook_remote_store_never_confirms_invalid_signature(clo
     assert not repository.donors.contains(response.donation_id)
 
 
-@pytest.mark.parametrize("field,value", [("storage_backend", "local"), ("payment_provider", "mock"),
-                                       ("enable_mock_psp", True), ("stripe_live_mode", False),
+@pytest.mark.parametrize("field,value", [("storage_backend", "local"),
                                        ("public_base_url", "http://example.com"), ("cors_origins", ["*"])])
 def test_production_configuration_fails_closed(field, value, monkeypatch):
     monkeypatch.delenv("FIRESTORE_EMULATOR_HOST", raising=False)
     settings = Settings(app_env="production", storage_backend="firestore", google_cloud_project="example",
-                        payment_provider="stripe", stripe_live_mode=True, enable_mock_psp=False,
                         public_base_url="https://example.com", cors_origins=["https://example.com"])
     settings.validate_runtime()
     setattr(settings, field, value)
@@ -253,13 +251,13 @@ def test_scheduler_requires_verified_identity_and_audience(monkeypatch):
         scheduler_auth.verify_scheduler("Bearer invalid", settings)
 
 
-def test_api_body_limits_security_headers_and_transient_failures(tmp_path, monkeypatch):
+def test_api_body_limits_security_headers_and_transient_failures(tmp_path, monkeypatch, stripe_http):
     import httpx
     from backend.app import config
     monkeypatch.setattr(config.settings, "data_dir", tmp_path)
     from backend.app import main
     settings = Settings(data_dir=tmp_path, email_enabled=False, intent_limit_per_minute=1)
-    provider = MockPaymentProvider(settings)
+    provider = StripePaymentProvider(settings)
     service = PaymentService(settings, provider)
     monkeypatch.setattr(main, "service", service)
     monkeypatch.setattr(main, "provider", provider)

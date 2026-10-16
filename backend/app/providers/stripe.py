@@ -12,20 +12,20 @@ import httpx
 
 from ..config import Settings
 from ..models import DonationProgram, PaymentMethod
-from .base import PaymentProvider, PaymentStartRequest, PaymentStartResult, ProviderWebhookEvent
+from .base import PaymentStartRequest, PaymentStartResult, ProviderWebhookEvent
 
 
-class StripePaymentProvider(PaymentProvider):
+class StripePaymentProvider:
     name = "stripe"
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        mode = "live" if settings.stripe_live_mode else "test"
-        if not settings.stripe_secret_key.startswith((f"sk_{mode}_", f"rk_{mode}_")):
-            raise ValueError("Configure uma chave Stripe correspondente ao STRIPE_LIVE_MODE.")
+        if not settings.stripe_secret_key.startswith(("sk_test_", "rk_test_", "sk_live_", "rk_live_")):
+            raise ValueError("Configure STRIPE_SECRET_KEY com uma chave secreta ou restrita da Stripe.")
+        self.live_mode = settings.stripe_secret_key.startswith(("sk_live_", "rk_live_"))
         if not settings.stripe_webhook_secret.startswith("whsec_"):
             raise ValueError("Configure STRIPE_WEBHOOK_SECRET para este endpoint.")
-        if (settings.app_env == "production" or settings.stripe_live_mode) and urlsplit(settings.public_base_url).scheme != "https":
+        if self.live_mode and urlsplit(settings.public_base_url).scheme != "https":
             raise ValueError("PUBLIC_BASE_URL deve usar HTTPS em produção.")
         self.supported_methods = (PaymentMethod.PIX, PaymentMethod.CARD, PaymentMethod.CARD_RECURRING)
 
@@ -37,9 +37,6 @@ class StripePaymentProvider(PaymentProvider):
 
     async def create_recurring_checkout(self, request: PaymentStartRequest) -> PaymentStartResult:
         return await self._create_checkout(request, "card", recurring=True)
-
-    async def create_pix_automatic(self, request: PaymentStartRequest) -> PaymentStartResult:
-        raise ValueError("Este adapter usa cartão para a contribuição mensal.")
 
     async def _create_checkout(self, request: PaymentStartRequest, method: str, *, recurring: bool) -> PaymentStartResult:
         metadata = {**request.metadata, "application": "fundo-centenario", "amount_cents": str(request.amount_cents)}
@@ -106,7 +103,7 @@ class StripePaymentProvider(PaymentProvider):
     async def parse_webhook(self, body: bytes, headers: dict[str, str]) -> ProviderWebhookEvent | None:
         self._verify_signature(body, headers.get("stripe-signature", ""))
         event = json.loads(body)
-        if event.get("livemode") is not self.settings.stripe_live_mode:
+        if event.get("livemode") is not self.live_mode:
             raise PermissionError("Modo do webhook incompatível com esta aplicação.")
         event_type = event.get("type")
         relevant = {

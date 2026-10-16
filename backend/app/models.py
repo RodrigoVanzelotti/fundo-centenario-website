@@ -28,7 +28,7 @@ PROGRAM_LABELS: dict[DonationProgram, str] = {
 
 class PaymentMethod(str, Enum):
     PIX = "pix"
-    PIX_AUTOMATIC = "pix_automatico"
+    PIX_AUTOMATIC = "pix_automatico"  # Historical records only; not accepted for new payments.
     CARD = "card"
     CARD_RECURRING = "card_recurring"
 
@@ -59,7 +59,7 @@ class DonorQuestionnaire(BaseModel):
 class DonationIntentRequest(BaseModel):
     donor: DonorQuestionnaire
     program: DonationProgram
-    method: PaymentMethod
+    method: Literal[PaymentMethod.PIX, PaymentMethod.CARD, PaymentMethod.CARD_RECURRING]
     amount_cents: int = Field(strict=True, ge=100, le=100_000_000)
 
 
@@ -79,11 +79,8 @@ class DonationIntentResponse(BaseModel):
     amount_cents: int
     program: DonationProgram
     program_label: str
-    pix_copy_paste: str | None = None
-    pix_qr_base64: str | None = None
     redirect_url: str | None = None
     expires_at: str | None = None
-    mock_confirm_url: str | None = None
 
 
 class DonationStatusResponse(BaseModel):

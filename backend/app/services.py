@@ -23,15 +23,14 @@ from .models import (
     PaymentMethod,
     PendingDonation,
 )
-from .providers.base import PaymentProvider, PaymentStartRequest, ProviderWebhookEvent
-from .providers.mock import MockPaymentProvider
+from .providers.base import PaymentStartRequest, ProviderWebhookEvent
+from .providers.stripe import StripePaymentProvider
 from .security import constant_time_equal, hash_token, new_status_token
-from .qr_utils import qr_png_base64
 from .storage import ConfirmedDonationStore, JsonlStore, PaymentConfirmationStore, PendingDonationStore
 
 
 class PaymentService:
-    def __init__(self, settings: Settings, provider: PaymentProvider, repository=None):
+    def __init__(self, settings: Settings, provider: StripePaymentProvider, repository=None):
         if settings.data_dir.resolve().is_relative_to(settings.frontend_dir.resolve()):
             raise ValueError("DATA_DIR deve permanecer fora da pasta pública do frontend.")
         self.settings = settings
@@ -108,35 +107,25 @@ class PaymentService:
         token_hash = hash_token(token)
 
         return_url = f"{self.settings.public_base_url}/como-apoiar/?donation_id={donation_id}"
-        webhook_url = f"{self.settings.public_base_url}/api/webhooks/{self.provider.name}"
         start_request = PaymentStartRequest(
             donation_id=donation_id,
             amount_cents=payload.amount_cents,
             currency="BRL",
             method=payload.method,
             program=payload.program,
-            donor_name=payload.donor.name,
-            donor_email=str(payload.donor.email),
-            donor_cpf=payload.donor.cpf,
             status_token_hash=token_hash,
             return_url=return_url,
-            webhook_url=webhook_url,
         )
 
         try:
             if payload.method == PaymentMethod.PIX:
                 result = await self.provider.create_pix(start_request)
-            elif payload.method == PaymentMethod.PIX_AUTOMATIC:
-                result = await self.provider.create_pix_automatic(start_request)
             elif payload.method == PaymentMethod.CARD_RECURRING:
                 result = await self.provider.create_recurring_checkout(start_request)
             else:
                 result = await self.provider.create_card_checkout(start_request)
         except Exception as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Não foi possível iniciar o pagamento no PSP. Tente novamente mais tarde.") from exc
-
-        if result.pix_copy_paste and not result.pix_qr_base64:
-            result.pix_qr_base64 = qr_png_base64(result.pix_copy_paste)
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Não foi possível iniciar o pagamento na Stripe. Tente novamente mais tarde.") from exc
 
         pending = PendingDonation(
             donation_id=donation_id,
@@ -159,11 +148,8 @@ class PaymentService:
             amount_cents=payload.amount_cents,
             program=payload.program,
             program_label=PROGRAM_LABELS[payload.program],
-            pix_copy_paste=result.pix_copy_paste,
-            pix_qr_base64=result.pix_qr_base64,
             redirect_url=result.redirect_url,
             expires_at=result.expires_at,
-            mock_confirm_url=result.mock_confirm_url,
         )
         if self.repository:
             await run_in_threadpool(self.repository.save_intent, key, response.model_dump(mode="json"))
@@ -207,7 +193,7 @@ class PaymentService:
         elif status_value == "failed":
             message = "O pagamento não foi concluído. Você pode iniciar uma nova tentativa."
         else:
-            message = "Aguardando confirmação do pagamento pelo banco ou PSP."
+            message = "Aguardando confirmação do pagamento pela Stripe."
 
         return DonationStatusResponse(
             donation_id=donation_id,
@@ -399,14 +385,3 @@ class PaymentService:
 
         self._queue_thank_you(confirmation)
         return self.get_status(donation_id, token)
-
-    def confirm_mock(self, provider_payment_id: str, key: str) -> tuple[ProviderWebhookEvent, str]:
-        if not isinstance(self.provider, MockPaymentProvider):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mock PSP não habilitado.")
-        try:
-            entry = self.provider.get_entry(provider_payment_id, key)
-            event = self.provider.confirm(provider_payment_id, key)
-        except KeyError as exc:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-        self.apply_provider_event(event)
-        return event, entry.request.return_url

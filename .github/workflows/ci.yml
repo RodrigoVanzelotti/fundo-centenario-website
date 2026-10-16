@@ -43,12 +43,13 @@ jobs:
           python -m pytest -q
           node tests/frontend-static.test.js
           node tests/donation-steps.test.js
+          cp backend/.env.example backend/.env
           docker compose config --quiet
           git diff --check
       - name: Build and smoke test container
         run: |
           docker build --platform linux/amd64 -t fundo:ci .
-          docker run -d --name fundo -p 127.0.0.1:8000:8000 -e APP_ENV=development -e STORAGE_BACKEND=local -e PAYMENT_PROVIDER=mock -e ENABLE_MOCK_PSP=true -e EMAIL_ENABLED=false fundo:ci
+          docker run -d --name fundo -p 127.0.0.1:8000:8000 -e APP_ENV=development -e STORAGE_BACKEND=local -e STRIPE_SECRET_KEY=sk_test_smoke_only -e STRIPE_WEBHOOK_SECRET=whsec_smoke_only -e EMAIL_ENABLED=false fundo:ci
           for _ in $(seq 1 30); do
             if curl --silent --fail http://127.0.0.1:8000/api/health >/dev/null; then break; fi
             sleep 1

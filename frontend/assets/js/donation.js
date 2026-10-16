@@ -22,11 +22,6 @@
   const customAmount = $("#customAmount");
   const amountButtons = $$(".amount-button");
   const methodOptions = $$(".payment-method-option");
-  const qrBox = $("#qrBox");
-  const pixCode = $("#pixCode");
-  const copyPixButton = $("#copyPixButton");
-  const mockConfirmButton = $("#mockConfirmButton");
-  const pixPaymentView = $("#pixPaymentView");
   const redirectPaymentView = $("#redirectPaymentView");
   const redirectButton = $("#redirectButton");
   const paymentStatusMessage = $("#paymentStatusMessage");
@@ -35,7 +30,6 @@
   let activeSession = readSession();
   let pollTimer = null;
   let polling = false;
-  let mockConfirmUrl = null;
 
   function formatBRL(value) {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -157,7 +151,7 @@
     backButton.hidden = stage !== "details";
     submitButton.textContent = stage === "contribution" ? "Continuar" : "Continuar para pagamento";
     if (stage === "details") {
-      const methodLabel = { pix: "Pix pontual", pix_automatico: "Pix Automático mensal", card: "Cartão de crédito", card_recurring: "Contribuição mensal no cartão" };
+      const methodLabel = { pix: "Pix pontual", card: "Cartão de crédito", card_recurring: "Contribuição mensal no cartão" };
       $("#contributionSummary").textContent = `${formatBRL(selectedAmount)} · ${methodLabel[selectedMethod()]}`;
     }
     paymentStage.hidden = stage !== "payment";
@@ -211,18 +205,6 @@
     }
   }
 
-  function renderQr(copyPaste, qrBase64) {
-    qrBox.innerHTML = "";
-    if (qrBase64) {
-      const image = document.createElement("img");
-      image.alt = `QR Code Pix para contribuição de ${formatBRL(selectedAmount)}`;
-      image.src = qrBase64.startsWith("data:") ? qrBase64 : `data:image/png;base64,${qrBase64}`;
-      qrBox.appendChild(image);
-      return;
-    }
-    qrBox.innerHTML = '<p class="qr-placeholder">O PSP não forneceu uma imagem do QR Code. Use o Pix Copia e Cola abaixo.</p>';
-  }
-
   async function createIntent() {
     const donor = questionnaire();
     const payload = {
@@ -262,45 +244,13 @@
 
   function renderPayment(response) {
     selectedAmount = response.amount_cents / 100;
-    $("#pixAmountLabel").textContent = formatBRL(selectedAmount);
-    mockConfirmUrl = response.mock_confirm_url || null;
-    mockConfirmButton.hidden = !mockConfirmUrl;
-
-    if (response.pix_copy_paste && (response.method === "pix" || response.method === "pix_automatico")) {
-      const automatic = response.method === "pix_automatico";
-      $("#paymentStageTitle").textContent = automatic
-        ? "Escaneie o QR Code para autorizar o Pix Automático."
-        : "Escaneie o QR Code e confirme no seu banco.";
-      $("#paymentStageCopy").textContent = automatic
-        ? "A autorização acontece no ambiente bancário. Os dados só serão gravados após a confirmação de um pagamento."
-        : "A página será atualizada automaticamente quando o PSP confirmar a transação.";
-      pixPaymentView.hidden = false;
-      pixCode.value = response.pix_copy_paste || "";
-      renderQr(response.pix_copy_paste, response.pix_qr_base64);
-      if (automatic && response.redirect_url) {
-        redirectPaymentView.hidden = false;
-        redirectButton.href = response.redirect_url;
-        $("#redirectTitle").textContent = "Prefere continuar no ambiente do PSP?";
-        $("#redirectCopy").textContent = "Você também pode abrir diretamente a experiência de autorização oferecida pelo provedor.";
-      } else {
-        redirectPaymentView.hidden = true;
-      }
-      return;
-    }
-
-    pixPaymentView.hidden = true;
     redirectPaymentView.hidden = false;
     redirectButton.href = response.redirect_url || "#";
-    const auto = response.method === "pix_automatico";
     const monthlyCard = response.method === "card_recurring";
-    $("#paymentStageTitle").textContent = auto ? "Autorize o Pix Automático no ambiente do PSP." : monthlyCard ? "Autorize sua contribuição mensal no checkout seguro." : "Finalize o pagamento no checkout seguro do PSP.";
-    $("#paymentStageCopy").textContent = auto
-      ? "A recorrência é criada pelo backend e autorizada no ambiente bancário."
-      : monthlyCard ? `Sua contribuição de ${formatBRL(selectedAmount)} será cobrada todo mês. O Fundo não recebe os dados do cartão.` : response.method === "pix" ? "O QR Code e o código Pix serão exibidos no ambiente seguro do provedor." : "O Fundo não coleta número de cartão, validade ou CVV.";
-    $("#redirectTitle").textContent = auto ? "Continuar para autorização do Pix Automático" : monthlyCard ? "Autorizar contribuição mensal" : response.method === "pix" ? "Continuar para pagamento Pix" : "Continuar para o checkout de cartão";
-    $("#redirectCopy").textContent = auto
-      ? "Você será encaminhado ao ambiente do PSP para revisar e autorizar a recorrência."
-      : monthlyCard ? "Revise o valor mensal e autorize a cobrança recorrente no checkout do provedor. O primeiro pagamento será confirmado pelo PSP." : response.method === "pix" ? "Escaneie o QR Code ou copie o código no checkout do provedor." : "Os dados do cartão serão tratados exclusivamente pelo checkout hospedado do PSP.";
+    $("#paymentStageTitle").textContent = monthlyCard ? "Autorize sua contribuição mensal no checkout seguro." : "Finalize o pagamento no checkout seguro da Stripe.";
+    $("#paymentStageCopy").textContent = monthlyCard ? `Sua contribuição de ${formatBRL(selectedAmount)} será cobrada todo mês. O Fundo não recebe os dados do cartão.` : response.method === "pix" ? "O QR Code e o código Pix serão exibidos no ambiente seguro da Stripe." : "O Fundo não coleta número de cartão, validade ou CVV.";
+    $("#redirectTitle").textContent = monthlyCard ? "Autorizar contribuição mensal" : response.method === "pix" ? "Continuar para pagamento Pix" : "Continuar para o checkout de cartão";
+    $("#redirectCopy").textContent = monthlyCard ? "Revise o valor mensal e autorize a cobrança recorrente no checkout da Stripe. O primeiro pagamento será confirmado pela Stripe." : response.method === "pix" ? "Escaneie o QR Code ou copie o código no checkout da Stripe." : "Os dados do cartão serão tratados exclusivamente pelo checkout hospedado da Stripe.";
     if (response.redirect_url) {
       setTimeout(() => {
         if (!document.hidden) window.location.assign(response.redirect_url);
@@ -379,16 +329,15 @@
     const donationId = url.searchParams.get("donation_id");
     if (!donationId && !activeSession?.donation_id) return false;
     if (!activeSession?.status_token || (donationId && activeSession.donation_id !== donationId)) {
-      setFormError("O PSP retornou ao site, mas esta sessão não possui os dados necessários para consultar a contribuição. Se o pagamento foi concluído, entre em contato com o Fundo informando a referência exibida pelo PSP.");
+      setFormError("O Stripe retornou ao site, mas esta sessão não possui os dados necessários para consultar a contribuição. Se o pagamento foi concluído, entre em contato com o Fundo informando a referência exibida pela Stripe.");
       url.searchParams.delete("donation_id");
       history.replaceState({}, "", url.pathname + url.search + url.hash);
       return false;
     }
     showStage("payment");
-    pixPaymentView.hidden = true;
     redirectPaymentView.hidden = true;
     $("#paymentStageTitle").textContent = "Verificando sua contribuição...";
-    $("#paymentStageCopy").textContent = "Estamos consultando a confirmação recebida do PSP.";
+    $("#paymentStageCopy").textContent = "Estamos consultando a confirmação recebida da Stripe.";
     if (!donationId && activeSession.payment) {
       renderPayment({ ...activeSession.payment, redirect_url: null });
       if (activeSession.payment.redirect_url) {
@@ -458,32 +407,6 @@
     if (Number.isFinite(parsed) && parsed > 0) {
       setAmount(parsed, null);
       amountButtons.forEach((button) => button.classList.remove("active"));
-    }
-  });
-
-  copyPixButton?.addEventListener("click", async () => {
-    if (!pixCode.value) return;
-    try {
-      await navigator.clipboard.writeText(pixCode.value);
-      copyPixButton.textContent = "Código copiado";
-      setTimeout(() => (copyPixButton.textContent = "Copiar código Pix"), 1600);
-    } catch {
-      pixCode.select();
-      document.execCommand("copy");
-    }
-  });
-
-  mockConfirmButton?.addEventListener("click", async () => {
-    if (!mockConfirmUrl) return;
-    mockConfirmButton.disabled = true;
-    mockConfirmButton.textContent = "Confirmando...";
-    try {
-      await api(mockConfirmUrl, { method: "POST" });
-      await pollOnce();
-    } catch (error) {
-      paymentStatusMessage.textContent = error.message || "Não foi possível simular a confirmação.";
-      mockConfirmButton.disabled = false;
-      mockConfirmButton.textContent = "Simular confirmação";
     }
   });
 

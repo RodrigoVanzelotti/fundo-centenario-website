@@ -31,7 +31,7 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
     return nodes.get(selector);
   };
   const form = node('#donationQuestionnaire');
-  const radios = ['pix', 'pix_automatico', 'card', 'card_recurring'].map(value => ({ value, disabled: false, checked: value === method }));
+  const radios = ['pix', 'card', 'card_recurring'].map(value => ({ value, disabled: false, checked: value === method }));
   const methodOptions = radios.map(radio => ({ ...node(`option-${radio.value}`), radio }));
   form.elements = { method: { get value() { return radios.find(radio => radio.checked && !radio.disabled)?.value || ''; } }, program: { value: 'geral' } };
   node('#donorStep').hidden = node('#donorStep').disabled = true;
@@ -59,21 +59,20 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
     },
     sessionStorage: {
       getItem() { return restoreLocal ? JSON.stringify({ donation_id: 'test', status_token: 'token',
-        donor: { name: 'Test Donor' }, payment: { method, amount_cents: 25000, pix_copy_paste: method === 'pix' ? 'pix-code' : null,
-          redirect_url: method === 'pix' ? null : 'https://example.com/checkout' } }) : null; },
+        donor: { name: 'Test Donor' }, payment: { method, amount_cents: 25000,
+          redirect_url: 'https://checkout.stripe.com/c/pay/test' } }) : null; },
       setItem() {}, removeItem() {},
     },
     history: { replaceState(state, title, url) { restoredUrl = url; } }, URL, Intl, setTimeout(callback) { callback(); },
     async fetch(url, options) {
       requests.push({ url, options });
-      if (url.endsWith('/options')) return { ok: !optionsFailure, json: async () => ({ methods: method === 'pix_automatico' ? radios.map(radio => radio.value) : ['pix', 'card', 'card_recurring'] }) };
+      if (url.endsWith('/options')) return { ok: !optionsFailure, json: async () => ({ methods: ['pix', 'card', 'card_recurring'] }) };
       if (url.endsWith('/intents') && failIntent) return { ok: false, json: async () => ({ detail: 'Try again' }) };
       if (url.endsWith('/finalize') && failFinalize) return { ok: false, json: async () => ({ detail: 'Temporary finalize failure' }) };
       return { ok: true, json: async () => ({
         donation_id: 'test', status_token: 'token', method, amount_cents: 25000,
         program_label: 'General', status, persisted: status === 'paid' && persisted,
-        pix_copy_paste: method === 'pix' ? 'pix-code' : null,
-        redirect_url: method === 'pix' ? null : 'https://example.com/checkout',
+        redirect_url: 'https://checkout.stripe.com/c/pay/test',
       }) };
     },
   });
@@ -84,8 +83,7 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
     assert(requests.some(request => request.url?.endsWith('/status')));
     assert(!requests.some(request => request.url?.endsWith('/intents')));
     assert(!requests.some(request => request.redirect)); // Reload must not force another PSP redirect.
-    if (method === 'pix') assert.equal(node('#pixCode').value, 'pix-code');
-    else assert.equal(node('#redirectButton').href, 'https://example.com/checkout');
+    assert.equal(node('#redirectButton').href, 'https://checkout.stripe.com/c/pay/test');
     return;
   }
   if (optionsFailure) {
@@ -95,7 +93,6 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
     assert(!requests.some(request => request.url?.endsWith('/intents')));
     return;
   }
-  assert.equal(methodOptions.find(option => option.radio.value === 'pix_automatico').hidden, method !== 'pix_automatico');
   assert.equal(methodOptions.find(option => option.radio.value === 'card_recurring').hidden, false);
   const intentRequests = () => requests.filter(request => request.url?.endsWith('/intents'));
   if (missingReturnSession) {
@@ -153,8 +150,7 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
   assert.equal(payload.method, method);
   assert.equal(node('#paymentStage').hidden, false);
   assert.equal(node('#successStage').hidden, true);
-  if (method === 'pix') assert.equal(node('#pixCode').value, 'pix-code');
-  else assert(requests.some(r => r.redirect === 'https://example.com/checkout'));
+  assert(requests.some(r => r.redirect === 'https://checkout.stripe.com/c/pay/test'));
   await new Promise(resolve => setImmediate(resolve));
   status = 'paid';
   persisted = false;
@@ -169,7 +165,7 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
 }
 
 (async () => {
-  for (const method of ['pix', 'pix_automatico', 'card', 'card_recurring']) await check(method);
+  for (const method of ['pix', 'card', 'card_recurring']) await check(method);
   await check('pix', true);
   await check('card_recurring', false, true);
   await check('pix', false, false, true);

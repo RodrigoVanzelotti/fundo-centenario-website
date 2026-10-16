@@ -23,9 +23,9 @@ def main():
                 assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"], path
             if args.production:
                 assert response.headers.get("Strict-Transport-Security"), path
-            if path == "/api/donations/options" and args.production:
+            if path == "/api/donations/options":
                 assert json.load(response)["methods"] == ["pix", "card", "card_recurring"]
-    for path in ("/backend/.env", "/backend/data/confirmed_donations.jsonl") + (("/openapi.json", "/api/docs") if args.production else ()):
+    for path in ("/backend/.env", "/backend/data/confirmed_donations.jsonl", "/mock-psp/card/removed", "/api/mock/removed/confirm") + (("/openapi.json", "/api/docs") if args.production else ()):
         try:
             urlopen(Request(base + path, headers=headers), timeout=20).close()
         except HTTPError as error:

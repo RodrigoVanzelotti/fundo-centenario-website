@@ -88,12 +88,8 @@
                         <span><strong>Pix pontual</strong><small>QR Code e confirmação automática.</small></span>
                       </label>
                       <label class="payment-method-option">
-                        <input type="radio" name="method" value="pix_automatico" />
-                        <span><strong>Pix Automático</strong><small>Autorize a recorrência no banco.</small></span>
-                      </label>
-                      <label class="payment-method-option">
                         <input type="radio" name="method" value="card" />
-                        <span><strong>Cartão de crédito</strong><small>Checkout hospedado pelo PSP.</small></span>
+                        <span><strong>Cartão de crédito</strong><small>Checkout hospedado pela Stripe.</small></span>
                       </label>
                       <label class="payment-method-option" hidden>
                         <input type="radio" name="method" value="card_recurring" disabled />
@@ -181,39 +177,20 @@
               <p id="paymentStageCopy">Finalize a contribuição no ambiente indicado abaixo.</p>
             </div>
 
-            <div id="pixPaymentView" hidden>
-              <div class="qr-result">
-                <div class="qr-box" id="qrBox"><p class="qr-placeholder">Preparando QR Code...</p></div>
-                <div class="qr-details">
-                  <span class="field-label">Valor</span>
-                  <h3 id="pixAmountLabel">R$ 0,00</h3>
-                  <p>Abra o aplicativo do seu banco, escaneie o QR Code e confira o recebedor antes de confirmar.</p>
-                  <div class="pix-code-wrap">
-                    <label class="field-label" for="pixCode">Pix Copia e Cola</label>
-                    <textarea class="pix-code" id="pixCode" readonly aria-label="Código Pix Copia e Cola"></textarea>
-                    <div class="inline-actions">
-                      <button class="button button-outline-dark" id="copyPixButton" type="button">Copiar código Pix</button>
-                      <button class="button button-outline-dark mock-only" id="mockConfirmButton" type="button" hidden>Simular confirmação</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div id="redirectPaymentView" class="redirect-payment-card" hidden>
               <div class="redirect-icon" aria-hidden="true">↗</div>
               <div>
-                <h3 id="redirectTitle">Abrindo ambiente seguro do PSP</h3>
-                <p id="redirectCopy">Os dados de pagamento serão tratados pelo provedor. O Fundo não recebe número do cartão, CVV ou credenciais bancárias.</p>
+                <h3 id="redirectTitle">Abrindo ambiente seguro da Stripe</h3>
+                <p id="redirectCopy">Os dados de pagamento serão tratados pela Stripe. O Fundo não recebe número do cartão, CVV ou credenciais bancárias.</p>
               </div>
-              <a class="button button-primary" id="redirectButton" href="#">Continuar no PSP</a>
+              <a class="button button-primary" id="redirectButton" href="#">Continuar na Stripe</a>
             </div>
 
             <div class="payment-wait-card">
               <span class="payment-spinner" aria-hidden="true"></span>
               <div>
                 <strong id="paymentWaitTitle">Aguardando confirmação</strong>
-                <p id="paymentStatusMessage">Assim que o PSP confirmar o pagamento, esta página será atualizada automaticamente.</p>
+                <p id="paymentStatusMessage">Assim que o Stripe confirmar o pagamento, esta página será atualizada automaticamente.</p>
               </div>
             </div>
           </section>

@@ -10,7 +10,7 @@ Nenhum recurso de nuvem foi criado automaticamente, nenhuma credencial foi preen
 |---|---|---|
 | JSONL e estado em memória não sobrevivem ao ciclo de vida do Cloud Run | Firestore, transações e intenções idempotentes compartilhadas | IAM, índices ativos e reinício de revisão em staging |
 | Emails dependiam de um worker contínuo | Scheduler autenticado, outbox e reserva transacional de envio | Credenciais SMTP, DNS do remetente e execução do job |
-| Configuração permitia mock e armazenamento local em produção | Inicialização bloqueia essas combinações, exige HTTPS e Stripe live | Segredos corretos, habilitação dos métodos e webhook test/live |
+| Configuração de pagamentos e armazenamento | Stripe em todos os ambientes; runtime exige HTTPS/Firestore no deploy e pipeline valida as credenciais | Segredos corretos, habilitação dos métodos e webhook test/live |
 | Dependências e imagem tinham vulnerabilidades conhecidas | Atualização de versões, lock com hashes e correção da biblioteca Debian | Manter auditorias e atualização da base |
 | Não havia pipeline de lançamento | CI e CD com OIDC, imagem por digest, revisão sem tráfego e smoke antes da promoção | Configurar GitHub environments, WIF, IAM e executar o primeiro pipeline |
 
@@ -38,7 +38,7 @@ flowchart LR
 - O cadastro do doador só é criado depois da confirmação, com autenticação pelo token da contribuição. O registro é criado uma vez, em transação.
 - A primeira confirmação, a fatura recorrente e a outbox são gravadas em uma transação. IDs de documento determinísticos e transações coordenam instâncias distintas.
 - Emails são processados somente quando existe pagamento e cadastro confirmado. Nenhum endpoint aceita destinatário/conteúdo arbitrários.
-- `STORAGE_BACKEND=local` e o PSP mock são exclusivos de desenvolvimento/testes. Produção e staging exigem Firestore e Stripe; produção exige modo live, staging usa chaves test.
+- `STORAGE_BACKEND=local` é exclusivo de desenvolvimento/testes. Stripe é usada em todos os ambientes. A pipeline injeta chaves test em staging e live em produção; ambos exigem Firestore.
 
 O modo local continua disponível por `docker compose up --build`, com volume local privado e recarga automática. Não implante esse Compose no Google Cloud.
 
@@ -123,6 +123,8 @@ Conceda ao runtime acesso a cada segredo necessário, sem acesso indiscriminado 
 ```bash
 gcloud secrets add-iam-policy-binding stripe-secret-key --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor
 gcloud secrets add-iam-policy-binding stripe-webhook-secret --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor
+# A pipeline verifica test/live sem expor a chave:
+gcloud secrets add-iam-policy-binding stripe-secret-key --member="serviceAccount:$DEPLOY_SA" --role=roles/secretmanager.secretAccessor
 # Execute estes dois somente se o remetente estiver configurado:
 gcloud secrets add-iam-policy-binding smtp-username --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor
 gcloud secrets add-iam-policy-binding smtp-password --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor
@@ -145,10 +147,10 @@ docker build --platform linux/amd64 -t "$IMAGE" .
 docker push "$IMAGE"
 ```
 
-Para obter a URL inicial, crie o serviço **privado**, sem PSP real, sem email, e sem autorização de confirmação mock:
+Para obter a URL inicial, crie o serviço **privado**, com credenciais sintéticas apenas para inicialização, sem email. Elas não autenticam chamadas à Stripe nem permitem criar pagamentos:
 
 ```bash
-gcloud run deploy "$SERVICE" --region "$REGION" --image "$IMAGE" --service-account "$RUNTIME_SA" --port 8000 --no-allow-unauthenticated --set-env-vars APP_ENV=development,STORAGE_BACKEND=local,PAYMENT_PROVIDER=mock,ENABLE_MOCK_PSP=false,EMAIL_ENABLED=false --max-instances 1 --quiet
+gcloud run deploy "$SERVICE" --region "$REGION" --image "$IMAGE" --service-account "$RUNTIME_SA" --port 8000 --no-allow-unauthenticated --set-env-vars APP_ENV=development,STORAGE_BACKEND=local,STRIPE_SECRET_KEY=sk_test_bootstrap_only,STRIPE_WEBHOOK_SECRET=whsec_bootstrap_only,EMAIL_ENABLED=false --max-instances 1 --quiet
 export RUN_URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 ```
 
@@ -163,9 +165,8 @@ Não publique essa revisão de bootstrap. Ela serve somente para reservar o serv
   "FIRESTORE_PREFIX": "fundo_",
   "PUBLIC_BASE_URL": "https://URL_NATIVA_DO_SERVICO",
   "CORS_ORIGINS": "https://URL_NATIVA_DO_SERVICO",
-  "PAYMENT_PROVIDER": "stripe",
-  "ENABLE_MOCK_PSP": "false",
-  "STRIPE_LIVE_MODE": "false",
+  "PYTHON_DOTENV_DISABLED": "1",
+  "STRIPE_API_VERSION": "2026-09-30.endive",
   "EMAIL_ENABLED": "false",
   "SCHEDULER_AUDIENCE": "https://URL_NATIVA_DO_SERVICO",
   "SCHEDULER_SERVICE_ACCOUNT": "fundo-scheduler@SEU_PROJECT_ID.iam.gserviceaccount.com",
@@ -174,7 +175,7 @@ Não publique essa revisão de bootstrap. Ela serve somente para reservar o serv
 }
 ```
 
-Em produção altere `APP_ENV` para `production`, `STRIPE_LIVE_MODE` para `true` e use os segredos live do projeto de produção. Não copie as credenciais test desse exemplo para o lançamento live.
+Em produção altere `APP_ENV` para `production` e use os segredos live do projeto de produção. O modo Stripe é definido pelas credenciais, sem uma flag adicional. Não copie as credenciais test desse exemplo para o lançamento live.
 
 ```bash
 gcloud run deploy "$SERVICE" --region "$REGION" --image "$IMAGE" --service-account "$RUNTIME_SA" --port 8000 --env-vars-file runtime.json --set-secrets STRIPE_SECRET_KEY=stripe-secret-key:1,STRIPE_WEBHOOK_SECRET=stripe-webhook-secret:1 --memory 512Mi --cpu 1 --concurrency 20 --min-instances 0 --max-instances 3 --timeout 180 --quiet
@@ -209,7 +210,7 @@ O código adiciona:
 - `.github/workflows/deploy.yml`: CI obrigatório, OIDC, build/smoke/publicação da mesma imagem, implantação por digest em revisão candidata sem tráfego, verificação de prontidão e promoção da revisão específica.
 - `.github/dependabot.yml`: acompanhamento semanal de dependências, imagens e Actions.
 
-PRs não recebem identidade Google nem acesso a produção. Actions são fixadas por SHA; o job de deploy solicita somente `contents: read` e `id-token: write`. A service account de deploy não precisa ler valores dos segredos ou dados de doadores.
+PRs não recebem identidade Google nem acesso a produção. Actions são fixadas por SHA; o job de deploy solicita somente `contents: read` e `id-token: write`. A service account de deploy lê somente `stripe-secret-key` para validar o modo antes do deploy, sem imprimir seu valor; não recebe acesso aos dados de doadores.
 
 ### Workload Identity Federation
 
@@ -247,6 +248,7 @@ Em Settings → Environments → environment → Environment variables:
 | `SMTP_HOST` | Host SMTP; obrigatório quando email estiver ativo |
 | `EMAIL_FROM_ADDRESS` | Remetente autorizado |
 | `EMAIL_REPLY_TO` | Atendimento; opcional |
+| `STRIPE_API_VERSION` | Versão alinhada ao webhook; padrão `2026-09-30.endive` |
 | `STRIPE_SECRET_VERSION` | Versão numérica do segredo; padrão `1` |
 | `STRIPE_WEBHOOK_SECRET_VERSION` | Versão numérica; padrão `1` |
 | `SMTP_SECRET_VERSION` | Mesma versão numérica para usuário e senha SMTP; padrão `1` |
@@ -281,7 +283,7 @@ Não envie os dados locais ao GitHub ou ao build Docker. O modo Firestore não l
 
 1. Pause novas contribuições no sistema anterior e deixe os pagamentos pendentes serem conciliados. Os registros antigos em memória não serão transferidos; não desligue o processo sem planejar sua recuperação.
 2. Faça backup privado dos JSONL, restrito e criptografado. Mantenha uma cópia imutável para recuperação.
-3. Reconcile pagamentos e assinaturas com a conta Stripe correta. Não importe pagamentos mock ou registros sem comprovação. Assinaturas anteriores sem metadata exigem reconciliação específica conforme `INTEGRATION.md`.
+3. Reconcile pagamentos e assinaturas com a conta Stripe correta. Não importe pagamentos simulados antigos ou registros sem comprovação. Assinaturas anteriores sem metadata exigem reconciliação específica conforme `INTEGRATION.md`.
 4. Instale as dependências em um ambiente isolado e obtenha ADC com uma identidade administrativa temporária autorizada.
 5. Valide primeiro uma cópia protegida do backup, sem acesso remoto:
 
@@ -305,7 +307,7 @@ Compare contagens e amostras de referências com a fonte e a Stripe, sem copiar 
 Antes de divulgar:
 
 - CI verde, regras e índices publicados, TTL confirmado, service accounts e WIF restritos.
-- Smoke público e prontidão do Firestore funcionando; produção sem mock, docs/OpenAPI públicos ou emulator.
+- Smoke público e prontidão do Firestore funcionando; produção sem docs/OpenAPI públicos ou emulator.
 - No staging: Pix, cartão pontual e mensal via Checkout real de teste, assinatura inválida rejeitada, webhook repetido sem duplicata, renovação, retorno do navegador e recuperação após reinício.
 - Envio SMTP de teste e retry verificados em destinatários controlados, com cadastro confirmado antes do envio.
 - No live: habilitação dos meios na conta, configuração de webhook, chaves e versão conferidas por responsável. Qualquer pagamento live de validação deve ser autorizado e conciliado.
@@ -313,7 +315,7 @@ Antes de divulgar:
 
 Configure alertas no Cloud Monitoring/Logging para disponibilidade, aumento de 5xx/429, falhas de webhook, falhas do Scheduler, mensagem `Agradecimento pendente` e tamanho/idade da outbox. Revise também confirmações sem cadastro; a perda da sessão do navegador pode deixar um pagamento confirmado aguardando identificação. Não capture bodies, CPF, emails, tokens ou Authorization em logs/analytics.
 
-O limite atual de 60 criações por minuto é global e compartilhado pelo Firestore. Ele limita sessões no PSP sem guardar IP. Um ataque pode consumir esse orçamento e bloquear temporariamente doadores; se necessário, adicione rate limiting por cliente em uma borda confiável, com política de privacidade, sem confiar cegamente em `X-Forwarded-For` enviado pelo cliente.
+O limite atual de 60 criações por minuto é global e compartilhado pelo Firestore. Ele limita sessões na Stripe sem guardar IP. Um ataque pode consumir esse orçamento e bloquear temporariamente doadores; se necessário, adicione rate limiting por cliente em uma borda confiável, com política de privacidade, sem confiar cegamente em `X-Forwarded-For` enviado pelo cliente.
 
 Configure backups gerenciados/PITR do Firestore conforme retenção aprovada, acesso restrito e recuperação testada em outro banco/projeto. Para exportações, use bucket privado, sem acesso público, com lifecycle e identidade administrativa separada do runtime. [Exportação/importação](https://docs.cloud.google.com/firestore/native/docs/manage-data/export-import).
 

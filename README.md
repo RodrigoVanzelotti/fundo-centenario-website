@@ -15,7 +15,7 @@ Frontend estático
   v
 FastAPI backend
   |
-  +--> PSP: cria Pix / Pix Automático / checkout de cartão
+  +--> Stripe: Checkout para Pix, cartão e assinatura mensal
   |
   <--- webhook de confirmação
   |
@@ -32,18 +32,19 @@ Rotas do site:
 
 ## Métodos implementados
 
-1. **Pix pontual**: backend cria a cobrança no PSP, gera a imagem do QR Code no servidor quando necessário, e o frontend exibe QR Code/Pix Copia e Cola e consulta o status até o webhook confirmar.
-2. **Pix Automático**: backend cria a autorização/recorrência no PSP. O PSP pode devolver um QR Code, uma URL de autorização ou ambos. O questionário só é persistido após um pagamento confirmado, não apenas após a autorização.
-3. **Cartão de crédito**: backend cria uma sessão de checkout hospedada pelo PSP e o usuário é redirecionado. O site do Fundo nunca recebe número do cartão, validade ou CVV.
-4. **Cartão mensal pela Stripe**: Checkout hospedado cria a assinatura mensal. Cada fatura é registrada uma única vez após webhook assinado de pagamento, inclusive nas renovações. A UI consulta `/api/donations/options` para exibir apenas os métodos disponíveis.
+1. **Pix pontual**: Checkout hospedado da Stripe apresenta o QR Code e o Pix Copia e Cola.
+2. **Cartão pontual**: Checkout hospedado da Stripe recebe os dados de pagamento.
+3. **Cartão mensal**: Checkout cria a assinatura. Cada fatura paga gera um registro, sem duplicatas.
 
-Com `PAYMENT_PROVIDER=stripe`, Pix pontual e cartão pontual também usam Checkout hospedado; a recorrência oferecida é mensal no cartão. Configure as chaves e o endpoint seguindo [INTEGRATION.md](INTEGRATION.md#stripe-contribuição-mensal-no-cartão). O `.env` existente não é alterado automaticamente.
+A mesma integração Stripe atende local, staging e produção. As credenciais fornecidas pelo ambiente definem test/live; o código não seleciona provedores nem credenciais por ambiente. A pipeline injeta os segredos do projeto selecionado e valida test em staging e live em produção. A API expõe somente os três métodos acima. Pix Automático não é oferecido nesta integração.
+
+Configure as chaves e o webhook conforme [INTEGRATION.md](INTEGRATION.md#stripe-contribuição-mensal-no-cartão). O retorno do navegador nunca confirma pagamento; somente eventos Stripe autenticados confirmam a contribuição.
 
 ## Questionário
 
-O formulário mostra uma etapa por vez: valor e forma de contribuição; programa, dados pessoais e consentimentos; pagamento por Pix ou no PSP. O botão `Voltar` permite revisar as escolhas sem apagar os dados. A cobrança só é criada ao concluir a segunda etapa.
+O formulário mostra uma etapa por vez: valor e forma de contribuição; programa, dados pessoais e consentimentos; pagamento no Checkout Stripe. O botão `Voltar` permite revisar as escolhas sem apagar os dados. A cobrança só é criada ao concluir a segunda etapa.
 
-Os avisos de erro são limpos ao interagir com o formulário ou recarregar a página. Um retorno do PSP sem sessão válida exibe um aviso e remove a referência da URL para que o aviso não se repita a cada recarga.
+Os avisos de erro são limpos ao interagir com o formulário ou recarregar a página. Um retorno da Stripe sem sessão válida exibe um aviso e remove a referência da URL para que o aviso não se repita a cada recarga.
 
 Antes do pagamento são coletados:
 
@@ -65,13 +66,13 @@ Programas disponíveis:
 
 No modo local, o questionário fica somente em memória enquanto o pagamento está pendente. No Firestore, ele não é mantido na intenção: permanece na sessão do navegador até a finalização após confirmação.
 
-`confirmed_donations.jsonl` só recebe o registro depois de uma confirmação `paid` válida do PSP.
+`confirmed_donations.jsonl` só recebe o registro depois de uma confirmação `paid` válida da Stripe.
 
 O backend mantém também `payment_confirmations.jsonl`, que não contém nome, e-mail nem CPF. Ele permite recuperar o fluxo se o processo reiniciar entre o pagamento e a gravação final do questionário.
 
 ## Produção: Cloud Run e Firestore
 
-A aplicação está preparada para persistência externa no Firestore e CI/CD pelo GitHub Actions. O procedimento completo de Google Cloud, Firebase, identidades, segredos, primeiro deploy, Scheduler, migração e rollback está em [DEPLOYMENT.md](DEPLOYMENT.md). Produção rejeita mock e JSONL local; staging usa Firestore com Stripe test. Frontend e API continuam na mesma imagem e origem.
+A aplicação está preparada para persistência externa no Firestore e CI/CD pelo GitHub Actions. O procedimento completo de Google Cloud, Firebase, identidades, segredos, primeiro deploy, Scheduler, migração e rollback está em [DEPLOYMENT.md](DEPLOYMENT.md). Staging e produção exigem Firestore. A pipeline seleciona as credenciais Stripe de cada ambiente. Frontend e API continuam na mesma imagem e origem.
 
 Em produção, intenções guardam somente dados de pagamento e autenticação, sem nome/email/CPF. O cadastro é enviado pelo navegador a `/finalize` depois da confirmação validada. Confirmações, faturas e pedidos de email são gravados em transação; o Scheduler processa uma outbox com leases e retries, sem depender de um worker permanente.
 
@@ -96,7 +97,9 @@ http://localhost:8000/
 http://localhost:8000/como-apoiar/
 ```
 
-O `.env.example` vem com `PAYMENT_PROVIDER=mock`. Isso permite testar os três fluxos sem credenciais reais.
+Preencha `STRIPE_SECRET_KEY` com uma chave de teste e `STRIPE_WEBHOOK_SECRET` com o segredo da Stripe CLI em `backend/.env` antes de iniciar. Execute `stripe listen` conforme [INTEGRATION.md](INTEGRATION.md). Sem credenciais Stripe, o backend recusa a inicialização.
+
+O `.env.example` contém a configuração local e os campos básicos para habilitar email. Firestore e Scheduler são configurados pela pipeline; opções de limites, caminhos e personalização usam os padrões de `backend/app/config.py` quando omitidas. Se alterar a origem local, defina também `CORS_ORIGINS` com a mesma origem de `PUBLIC_BASE_URL`. Host e porta são argumentos do Uvicorn; no container, a porta usa `PORT`.
 
 ## Containers
 
@@ -106,7 +109,7 @@ O `docker-compose.yml` é exclusivo para desenvolvimento local:
 docker compose up --build
 ```
 
-As dependências são instaladas durante o build, e o container inicia diretamente o Uvicorn. O Compose monta o código para recarga automática e usa o PSP mock. Ao alterar `backend/requirements.txt`, reconstrua a imagem. Os dados locais ficam no volume `donation-data`, separado de `backend/data` usado ao executar Python diretamente. `docker compose down` preserva o volume; a opção `--volumes` apaga esses dados. O Compose não carrega `backend/.env` nem habilita emails.
+As dependências são instaladas durante o build, e o container inicia diretamente o Uvicorn. O Compose monta o código para recarga automática e usa Stripe. Ao alterar `backend/requirements.txt`, reconstrua a imagem. Os dados locais ficam no volume `donation-data`, separado de `backend/data` usado ao executar Python diretamente. `docker compose down` preserva o volume; a opção `--volumes` apaga esses dados. O Compose carrega `backend/.env` para as credenciais Stripe e mantém emails desabilitados. Para encaminhar webhooks, rode a Stripe CLI no host.
 
 Para produção, construa a imagem na raiz do repositório e publique o artefato no registry utilizado pela infraestrutura:
 
@@ -120,37 +123,21 @@ No ambiente de produção, injete configurações e segredos em runtime pelo Sec
 
 No Cloud Run, use `STORAGE_BACKEND=firestore`, com projeto, identidade e banco privado. Não monte JSONL como persistência de produção. A imagem usa lock com hashes e base fixada por digest; o workflow implanta uma imagem testada por digest. Dados locais existentes exigem migração explícita e reconciliação.
 
-## Testar o Pix local
+## Testar pagamentos localmente
 
-1. Escolha o valor e Pix pontual; clique em `Continuar`.
-2. Escolha o programa, preencha os dados e confirme a ciência sobre privacidade.
-3. Clique em `Continuar para pagamento`.
-4. O backend gera uma cobrança Pix mock.
-5. Clique em `Simular confirmação`.
-6. O frontend consulta o status e mostra a mensagem de agradecimento.
-7. O registro é gravado em `backend/data/confirmed_donations.jsonl` somente nesse momento.
+1. Configure uma chave Stripe de teste e encaminhe os eventos pela Stripe CLI.
+2. Abra `/como-apoiar/`, escolha Pix, cartão pontual ou cartão mensal e preencha o questionário.
+3. Conclua o pagamento no Checkout Stripe com os dados de teste oficiais.
+4. O webhook assinado confirma o pagamento; o retorno ao site consulta essa confirmação.
+5. O cadastro é persistido uma vez, somente após pagamento confirmado.
 
-## Testar Pix Automático e cartão
-
-No provider mock, o backend abre uma página que representa o ambiente externo do PSP.
-
-Clique em `Confirmar pagamento de teste`. O mock retorna para `/como-apoiar/`, o frontend consulta o backend e exibe a confirmação.
-
-## Conectar um PSP real
-
-Leia `INTEGRATION.md` antes de trocar:
-
-```env
-PAYMENT_PROVIDER=generic_http
-```
-
-As credenciais ficam exclusivamente no arquivo `backend/.env` ou no secret manager da infraestrutura. Nunca coloque credenciais em `frontend/assets/js/config.js`.
+Não há endpoint ou botão de confirmação manual. Consulte [INTEGRATION.md](INTEGRATION.md) para eventos, recorrência e recuperação.
 
 ## Email de agradecimento
 
 Após a confirmação e o cadastro do doador, o backend envia um agradecimento transacional por SMTP com TLS. O HTML está em [backend/templates/donation_thank_you.html](backend/templates/donation_thank_you.html) e usa os parâmetros `${donor_name}`, `${amount}`, `${cause}`, `${contribution_type}`, `${thank_you_text}` e `${activity_url}`. O email não contém CPF. Há também uma versão em texto simples.
 
-As configurações foram adicionadas a `backend/.env` e `backend/.env.example`, com envio desabilitado por padrão. Para ativar, preencha:
+O envio vem desabilitado em `backend/.env` e `backend/.env.example`. Para ativar, preencha as credenciais e o remetente; as demais opções abaixo são personalizações opcionais:
 
 ```env
 EMAIL_ENABLED=true

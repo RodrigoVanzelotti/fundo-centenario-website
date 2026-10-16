@@ -7,7 +7,7 @@ Uma linha JSON por contribuição confirmada:
 ```json
 {
   "donation_id": "uuid",
-  "provider_payment_id": "pay_123",
+  "provider_payment_id": "cs_test_example",
   "method": "pix",
   "program": "edital-projetos",
   "program_label": "Edital de projetos",
@@ -29,7 +29,7 @@ Usado para idempotência e recuperação. Não contém o questionário:
 ```json
 {
   "donation_id": "uuid",
-  "provider_payment_id": "pay_123",
+  "provider_payment_id": "cs_test_example",
   "status_token_hash": "sha256...",
   "method": "pix",
   "program": "edital-projetos",
@@ -58,10 +58,12 @@ O registro de envios contém os mesmos identificadores e `sent_at` (UTC), indica
 As coleções usam prefixo `fundo_` no banco `(default)`. IDs são SHA-256 dos identificadores de contribuição/pagamento. Confirmações, faturas, cadastro e marcadores enviados mantêm os campos dos JSONL; arquivos são apenas o modo local.
 
 - `fundo_pending`: intenção sem `donor`, com `expires_at_epoch` e timestamp `expires_at` para TTL. Sem nome/email/CPF.
-- `fundo_intents`: chave opaca, referência, token de consulta, valor/método/programa, horário e resposta PSP para idempotência. Sem questionário; acesso exclusivamente server-side. Não expira automaticamente para evitar reutilização silenciosa da tentativa.
+- `fundo_intents`: chave opaca, referência, token de consulta, valor/método/programa, horário e resposta Stripe para idempotência. Sem questionário; acesso exclusivamente server-side. Não expira automaticamente para evitar reutilização silenciosa da tentativa.
 - `fundo_payment_confirmations`, `fundo_recurring_payments`, `fundo_confirmed_donations`: confirmações e cadastro descritos acima. Cadastro criado em transação somente após confirmação autenticada.
 - `fundo_thank_you_outbox`: IDs, `state` (`pending`/`sent`), `next_attempt_at` (epoch), `attempts` e `lease`. Sem destinatário ou CPF. Reserva de cinco minutos; conclusão e marcador enviado gravados juntos.
 - `fundo_thank_you_sent`: IDs e `sent_at`, sem PII.
 - `fundo_rate_limits`: contador global por minuto e timestamp `expires_at`; sem IP.
 
 Confirmação, fatura e primeiro pedido de envio são transacionais, assim como aquisição de email e finalização. Regras Firebase bloqueiam clientes; o SDK Python usa IAM. Migração, índices, TTL e retenção estão em [DEPLOYMENT.md](DEPLOYMENT.md).
+
+O valor histórico `pix_automatico` continua legível em registros existentes, mas não é aceito em novas intenções. Os nomes persistidos `provider_payment_id`, `provider_event_id` e `provider_subscription_id` foram preservados para evitar migração de dados.

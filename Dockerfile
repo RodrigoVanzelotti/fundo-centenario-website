@@ -3,7 +3,7 @@ FROM python:3.12-slim@sha256:02108f5d322dd89f1c9e552442c25acb0543dfdbc455693a559
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     APP_ENV=production \
-    ENABLE_MOCK_PSP=false \
+    PYTHON_DOTENV_DISABLED=1 \
     STORAGE_BACKEND=firestore \
     DATA_DIR=/var/lib/fundo-centenario
 

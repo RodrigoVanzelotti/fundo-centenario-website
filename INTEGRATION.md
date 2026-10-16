@@ -1,4 +1,4 @@
-# Integração com PSP real
+# Integração Stripe
 
 ## Stripe: contribuição mensal no cartão
 
@@ -7,16 +7,13 @@ O adapter `backend/app/providers/stripe.py` usa a API oficial via `httpx`, já i
 Configure no backend (Secret Manager em produção; `.env` apenas local):
 
 ```env
-PAYMENT_PROVIDER=stripe
-ENABLE_MOCK_PSP=false
 STRIPE_SECRET_KEY=CHAVE_SECRETA_DA_SUA_CONTA_DE_TESTE
 STRIPE_WEBHOOK_SECRET=SEGREDO_DO_ENDPOINT_DE_TESTE
 STRIPE_API_VERSION=2026-09-30.endive
-STRIPE_LIVE_MODE=false
 PUBLIC_BASE_URL=http://localhost:8000
 ```
 
-Use a chave `sk_test_...` ou uma chave restrita `rk_test_...` com permissão de criar Checkout Sessions. `STRIPE_WEBHOOK_SECRET` deve conter o `whsec_...` do endpoint que envia os eventos. Não reutilize o segredo da CLI no endpoint de produção. O adapter rejeita uma chave cujo modo seja diferente de `STRIPE_LIVE_MODE`.
+Use a chave `sk_test_...` ou uma chave restrita `rk_test_...` com permissão de criar Checkout Sessions. `STRIPE_WEBHOOK_SECRET` deve conter o `whsec_...` do endpoint que envia os eventos. Não reutilize o segredo da CLI no endpoint de produção. O modo test/live é identificado pela chave injetada, e o webhook deve corresponder a esse modo. Não há seleção de provedor ou de segredos no código.
 
 No Dashboard, habilite cartão e, se desejado, Pix pontual para a conta. Cadastre um destino de **snapshot events da própria conta**, na mesma versão indicada por `STRIPE_API_VERSION`, com URL:
 
@@ -38,7 +35,7 @@ Selecione estes eventos:
 
 Metadata de sessão e assinatura contém somente referência da contribuição, hash do token, programa, método e valor. A Stripe copia a metadata da assinatura para `parent.subscription_details.metadata` da fatura. Nome, e-mail e CPF do formulário não são enviados nesta metadata nem na requisição de criação; o Checkout coleta as informações necessárias ao processamento.
 
-`GET /api/donations/options` informa os métodos disponíveis sem credenciais. Com Stripe, a UI mostra Pix pontual, cartão pontual e **Contribuição mensal no cartão** (`card_recurring`). Pix pontual também usa o Checkout hospedado para exibir o QR Code. O cancelamento do Checkout retorna ao formulário; o retorno de sucesso consulta o status autenticado no backend. Pix Automático permanece nos adapters mock/genérico, e não é usado pelo adapter Stripe nesta integração.
+`GET /api/donations/options` informa os métodos disponíveis sem credenciais. Com Stripe, a UI mostra Pix pontual, cartão pontual e **Contribuição mensal no cartão** (`card_recurring`). Pix pontual também usa o Checkout hospedado para exibir o QR Code. O cancelamento do Checkout retorna ao formulário; o retorno de sucesso consulta o status autenticado no backend. Pix Automático não é oferecido nesta integração.
 
 ### Testar localmente
 
@@ -63,231 +60,11 @@ Cobranças seguintes, tentativas de recuperação, mudança de cartão e cancela
 
 Assinaturas já existentes na conta Stripe não são automaticamente vinculadas ao cadastro local. Eventos sem a metadata desta aplicação são ignorados para não atribuir pagamentos a doadores incorretos. Uma migração deve reconciliar as referências existentes antes de adicionar metadata; a implementação não modifica assinaturas antigas nem o `.env` atual.
 
-Produção exige Firestore, chaves/endpoint live, `STRIPE_LIVE_MODE=true` e origem HTTPS. Confirmação, fatura e outbox são transacionais. Staging aceita Stripe test; JSONL é exclusivo de desenvolvimento e exige um processo. Consulte [DEPLOYMENT.md](DEPLOYMENT.md) para configuração, migração e Scheduler.
+Staging e produção exigem Firestore e origem HTTPS. A pipeline injeta as credenciais do projeto de cada ambiente e rejeita chave live em staging ou test em produção. Confirmação, fatura e outbox são transacionais. Staging aceita Stripe test; JSONL é exclusivo de desenvolvimento e exige um processo. Consulte [DEPLOYMENT.md](DEPLOYMENT.md) para configuração, migração e Scheduler.
 
 Referências oficiais: [Checkout Sessions](https://docs.stripe.com/api/checkout/sessions/create), [metadata](https://docs.stripe.com/metadata), [webhooks e assinatura](https://docs.stripe.com/webhooks), [tipos de eventos](https://docs.stripe.com/api/events/types), [versionamento](https://docs.stripe.com/api/versioning).
 
-## Outros PSPs: adapter genérico
-
-A implementação separa o site do contrato específico de um banco ou PSP.
-
-O frontend não precisa mudar quando o provedor for substituído. A camada de integração está em:
-
-```text
-backend/app/providers/
-```
-
-## 1. O que o PSP precisa oferecer
-
-Para atender aos três fluxos, o provedor escolhido deve disponibilizar, idealmente:
-
-### Pix pontual
-
-- endpoint para criar cobrança Pix;
-- retorno de Pix Copia e Cola e/ou QR Code base64;
-- identificador único da cobrança;
-- webhook de pagamento confirmado.
-
-### Pix Automático
-
-- endpoint para criar recorrência/autorização;
-- URL hospedada ou QR Code para o pagador autorizar;
-- referência externa/metadata;
-- webhook de autorização e, principalmente, webhook de pagamento efetivamente liquidado.
-
-O sistema **não grava o questionário ao receber apenas `authorized`**. A gravação acontece quando chegar um evento normalizado como `paid`.
-
-### Cartão
-
-- criação de sessão de checkout hospedada;
-- `return_url` depois do checkout;
-- webhook de pagamento aprovado.
-
-O checkout precisa permanecer hospedado no PSP. Não adapte o projeto para receber PAN, CVV ou validade diretamente.
-
----
-
-# 2. Credenciais necessárias
-
-Todas as credenciais abaixo são **server-side**.
-
-Edite `backend/.env`, nunca `frontend/assets/js/config.js`.
-
-## OAuth Client Credentials
-
-Se o PSP usar OAuth:
-
-```env
-PSP_AUTH_MODE=oauth_client_credentials
-PSP_OAUTH_TOKEN_URL=https://api.seu-psp.com/oauth/token
-PSP_CLIENT_ID=SEU_CLIENT_ID
-PSP_CLIENT_SECRET=SEU_CLIENT_SECRET
-PSP_OAUTH_SCOPE=
-```
-
-## API Key
-
-```env
-PSP_AUTH_MODE=api_key
-PSP_API_KEY=SEGREDO
-PSP_API_KEY_HEADER=X-API-Key
-```
-
-## Bearer fixo
-
-Use somente se o provedor documentar um token estático server-side:
-
-```env
-PSP_AUTH_MODE=bearer
-PSP_BEARER_TOKEN=SEGREDO
-```
-
-## Webhook
-
-```env
-PSP_WEBHOOK_SECRET=SEGREDO_DO_WEBHOOK
-PSP_WEBHOOK_SIGNATURE_HEADER=X-Webhook-Signature
-```
-
-O adapter `generic_http` implementa HMAC-SHA256 simples. Muitos PSPs usam esquemas próprios, por exemplo timestamp + assinatura, JWS, certificado ou cabeçalhos específicos. Nesse caso altere **somente** `GenericHttpPaymentProvider._verify_hmac()` / `parse_webhook()` ou crie um provider específico.
-
----
-
-# 3. Endpoints do PSP
-
-Configure os caminhos reais:
-
-```env
-PSP_BASE_URL=https://api.seu-psp.com
-PSP_PIX_CREATE_PATH=/pix/payments
-PSP_PIX_AUTOMATIC_CREATE_PATH=/pix/automatic/authorizations
-PSP_CARD_CHECKOUT_PATH=/checkout/sessions
-```
-
-O adapter envia um payload normalizado semelhante a. Por padrão, os dados pessoais do questionário **não são enviados ao PSP** (`PSP_SEND_CUSTOMER_DATA=false`). Habilite isso somente se a API do provedor exigir:
-
-```env
-PSP_SEND_CUSTOMER_DATA=true
-```
-
-Payload normalizado:
-
-```json
-{
-  "external_reference": "UUID_DA_DOACAO",
-  "amount_cents": 10000,
-  "currency": "BRL",
-  "description": "Contribuição ao Fundo Centenário",
-  "customer": {
-    "name": "enviado somente se PSP_SEND_CUSTOMER_DATA=true",
-    "email": "...",
-    "cpf": "..."
-  },
-  "metadata": {
-    "donation_id": "UUID_DA_DOACAO",
-    "status_token_hash": "HASH_SHA256",
-    "program": "edital-projetos",
-    "method": "pix"
-  },
-  "return_url": "https://site/como-apoiar/?donation_id=...",
-  "webhook_url": "https://site/api/webhooks/generic_http"
-}
-```
-
-**Importante:** cada PSP possui um JSON diferente. Se o provedor não aceitar esse formato, altere apenas `_payload()` em:
-
-```text
-backend/app/providers/generic_http.py
-```
-
----
-
-# 4. Mapeamento da resposta
-
-O projeto permite apontar onde estão os campos no JSON do PSP usando dot notation:
-
-```env
-PSP_FIELD_PAYMENT_ID=id
-PSP_FIELD_STATUS=status
-PSP_FIELD_PIX_COPY_PASTE=pix.copy_paste
-PSP_FIELD_PIX_QR_BASE64=pix.qr_base64
-PSP_FIELD_REDIRECT_URL=redirect_url
-PSP_FIELD_EXPIRES_AT=expires_at
-```
-
-Exemplo de resposta compatível:
-
-```json
-{
-  "id": "pay_123",
-  "status": "pending",
-  "pix": {
-    "copy_paste": "000201...",
-    "qr_base64": null
-  },
-  "redirect_url": null,
-  "expires_at": "2026-10-02T15:30:00Z"
-}
-```
-
-Para cartão, `redirect_url` deve apontar para a página hospedada pelo PSP.
-
----
-
-# 5. Webhook e confirmação
-
-Endpoint exposto pelo Fundo:
-
-```text
-POST /api/webhooks/generic_http
-```
-
-O webhook precisa permitir recuperar a referência da doação. A solução preferencial é configurar `external_reference` ou metadata no PSP.
-
-Mapeamento padrão:
-
-```env
-PSP_WEBHOOK_FIELD_EVENT_ID=event_id
-PSP_WEBHOOK_FIELD_PAYMENT_ID=payment_id
-PSP_WEBHOOK_FIELD_DONATION_ID=metadata.donation_id
-PSP_WEBHOOK_FIELD_STATUS=status
-PSP_WEBHOOK_FIELD_AMOUNT_CENTS=amount_cents
-PSP_WEBHOOK_FIELD_TOKEN_HASH=metadata.status_token_hash
-PSP_WEBHOOK_FIELD_PROGRAM=metadata.program
-PSP_WEBHOOK_FIELD_METHOD=metadata.method
-```
-
-Status considerados pagos:
-
-```env
-PSP_PAID_STATUSES=paid,confirmed,approved,completed
-```
-
-Ajuste aos nomes usados pelo provedor.
-
-Quando chega um evento pago:
-
-```text
-PSP webhook
-   |
-   v
-verificação de assinatura
-   |
-   v
-payment_confirmations.jsonl (sem PII do questionário)
-   |
-   +--> se o questionário ainda estiver em memória
-   |       confirmed_donations.jsonl
-   |
-   +--> frontend consulta /status
-           |
-           v
-         agradecimento
-```
-
----
-
-# 6. Confiabilidade do questionário pendente
+## Confiabilidade do questionário pendente
 
 Para cumprir a regra de não gravar PII antes do pagamento, o questionário fica em `sessionStorage`. No modo local há também uma cópia em memória no backend; no Firestore a intenção exclui o questionário. A perda da sessão do navegador ainda exige recuperação administrativa da identificação, independentemente de reinício do backend.
 
@@ -312,7 +89,7 @@ Para produção com alto volume, a alternativa é um cache temporário criptogra
 
 ---
 
-# 7. Reverse proxy recomendado
+## Reverse proxy recomendado
 
 Mesmo que frontend e backend sejam implantados separadamente, publique-os sob a mesma origem:
 

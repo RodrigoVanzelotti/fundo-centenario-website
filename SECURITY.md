@@ -50,7 +50,7 @@ Em produção, force HTTPS para:
 - API;
 - `return_url`;
 - `webhook_url`;
-- PSP.
+- Stripe.
 
 Não transmita CPF em HTTP.
 
@@ -70,7 +70,7 @@ O modo JSONL local suporta um processo/worker. Produção usa Firestore: confirm
 
 Nunca aceite o status enviado pelo navegador como prova de pagamento.
 
-A prova deve vir do PSP e passar por:
+A prova deve vir da Stripe e passar por:
 
 1. verificação criptográfica da assinatura;
 2. validação de identificador/referência externa;
@@ -78,11 +78,9 @@ A prova deve vir do PSP e passar por:
 4. idempotência;
 5. quando possível, validação de valor e moeda.
 
-O `generic_http` contém HMAC-SHA256 apenas como implementação genérica. Adapte para o algoritmo oficial do PSP.
-
 ## Cartão
 
-O projeto usa checkout hospedado. Isso reduz o escopo de dados de cartão, mas não elimina automaticamente todas as obrigações PCI DSS da organização. Confirme o modelo de integração e o escopo aplicável com o PSP e a equipe responsável.
+O projeto usa checkout hospedado. Isso reduz o escopo de dados de cartão, mas não elimina automaticamente todas as obrigações PCI DSS da organização. Confirme o modelo de integração e o escopo aplicável com a Stripe e a equipe responsável.
 
 ## CPF e minimização
 
@@ -102,7 +100,7 @@ O agradecimento é transacional e não altera o opt-in de novidades. Configure r
 
 ## Recomendações de infraestrutura
 
-- MFA para contas de deploy e PSP;
+- MFA para contas de deploy e Stripe;
 - secrets em secret manager, não em `.env` no servidor quando houver opção melhor;
 - usuário de processo sem privilégios;
 - rate limiting para criação de intents;
@@ -116,8 +114,8 @@ O agradecimento é transacional e não altera o opt-in de novidades. Configure r
 
 ## Deploy e fronteiras de confiança
 
-Consulte [DEPLOYMENT.md](DEPLOYMENT.md). Produção exige Firestore e Stripe live; staging aceita Stripe test. Configurações incompatíveis falham na inicialização, e arquivos de chave/emulator são rejeitados nesses ambientes. Segredos são injetados por versão numérica. O CI usa WIF/OIDC restrito, sem chave Google de longa duração.
+Consulte [DEPLOYMENT.md](DEPLOYMENT.md). Staging e produção exigem Firestore. A pipeline valida e injeta as credenciais Stripe test/live de cada ambiente; o backend verifica que o modo do webhook corresponde à chave recebida. Configurações incompatíveis falham na inicialização, e arquivos de chave/emulator são rejeitados nesses ambientes. Segredos são injetados por versão numérica. O CI usa WIF/OIDC restrito, sem chave Google de longa duração.
 
 API não é cacheável. HTML recebe CSP por header, nosniff, Referrer-Policy e Permissions-Policy. Requisições são limitadas a 32 KiB, exceto webhooks (1 MiB). Falhas inesperadas registram apenas a classe da exceção e retornam erro genérico. Não configure captura de bodies/tokens na infraestrutura.
 
-A criação exige UUID de idempotência em staging/produção. Essa credencial opaca é distinta da referência pública da contribuição e não deve aparecer em logs/analytics. O registro contém token e resposta PSP, sem questionário, e exige acesso restrito. Retries reutilizam a referência no PSP; tentativas antigas sem resposta não criam cobrança automaticamente.
+A criação exige UUID de idempotência em staging/produção. Essa credencial opaca é distinta da referência pública da contribuição e não deve aparecer em logs/analytics. O registro contém token e resposta Stripe, sem questionário, e exige acesso restrito. Retries reutilizam a referência na Stripe; tentativas antigas sem resposta não criam cobrança automaticamente.

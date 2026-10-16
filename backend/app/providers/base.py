@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,12 +13,8 @@ class PaymentStartRequest:
     currency: str
     method: PaymentMethod
     program: DonationProgram
-    donor_name: str
-    donor_email: str
-    donor_cpf: str
     status_token_hash: str
     return_url: str
-    webhook_url: str
 
     @property
     def metadata(self) -> dict[str, str]:
@@ -35,11 +30,8 @@ class PaymentStartRequest:
 class PaymentStartResult:
     provider_payment_id: str
     status: str = "pending"
-    pix_copy_paste: str | None = None
-    pix_qr_base64: str | None = None
     redirect_url: str | None = None
     expires_at: str | None = None
-    mock_confirm_url: str | None = None
 
 
 @dataclass(slots=True)
@@ -56,27 +48,3 @@ class ProviderWebhookEvent:
     payload: dict[str, Any] = field(default_factory=dict)
     provider_subscription_id: str | None = None
     currency: str | None = None
-
-
-class PaymentProvider(ABC):
-    name: str
-    supported_methods = (PaymentMethod.PIX, PaymentMethod.PIX_AUTOMATIC, PaymentMethod.CARD)
-
-    async def create_recurring_checkout(self, request: PaymentStartRequest) -> PaymentStartResult:
-        raise ValueError("Contribuição mensal no cartão indisponível neste provedor.")
-
-    @abstractmethod
-    async def create_pix(self, request: PaymentStartRequest) -> PaymentStartResult:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def create_pix_automatic(self, request: PaymentStartRequest) -> PaymentStartResult:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def create_card_checkout(self, request: PaymentStartRequest) -> PaymentStartResult:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def parse_webhook(self, body: bytes, headers: dict[str, str]) -> ProviderWebhookEvent | None:
-        raise NotImplementedError

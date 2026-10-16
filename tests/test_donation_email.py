@@ -12,12 +12,13 @@ from fastapi import HTTPException
 from backend.app.config import Settings
 from backend.app.emailer import DonationEmailSender
 from backend.app.models import DonationFinalizeRequest, DonationIntentRequest, DonorQuestionnaire
-from backend.app.providers.mock import MockPaymentProvider
+from backend.app.providers.stripe import StripePaymentProvider
+from backend.app.providers.base import ProviderWebhookEvent
 from backend.app.services import PaymentService
 
 
 @pytest.fixture
-def email_flow(tmp_path, monkeypatch):
+def email_flow(tmp_path, monkeypatch, stripe_http):
     settings = Settings(
         data_dir=tmp_path, public_base_url="https://fund.example.org", app_env="development",
         email_enabled=True, smtp_host="smtp.example.org", smtp_port=587,
@@ -57,15 +58,19 @@ def email_flow(tmp_path, monkeypatch):
 
     monkeypatch.setattr(smtplib, "SMTP", SMTP)
     monkeypatch.setattr(smtplib, "SMTP_SSL", SMTP)
-    service = PaymentService(settings, MockPaymentProvider(settings))
+    service = PaymentService(settings, StripePaymentProvider(settings))
     request = DonationIntentRequest(
         donor=DonorQuestionnaire(name="Maria <b>Silva</b> & Família", email="maria@example.org", cpf="52998224725"),
         program="mentoria", method="pix", amount_cents=123456,
     )
     response = asyncio.run(service.create_intent(request))
     pending = service.pending.get(response.donation_id)
-    entry = service.provider.entries[pending.provider_payment_id]
-    event = service.provider.confirm(entry.provider_payment_id, entry.mock_key)
+    event = ProviderWebhookEvent(
+        event_id="evt_email", provider_payment_id=pending.provider_payment_id,
+        donation_id=response.donation_id, status="paid", amount_cents=request.amount_cents,
+        status_token_hash=pending.status_token_hash, method=request.method.value, program=request.program.value,
+        currency="brl",
+    )
     return service, settings, response, request, event, calls, messages
 
 
@@ -114,7 +119,7 @@ def test_duplicate_restart_and_concurrent_workers_do_not_resend(email_flow):
         list(pool.map(lambda _: service.process_pending_emails(), range(4)))
     assert len(messages) == 1
     service.apply_provider_event(event)
-    restarted = PaymentService(settings, MockPaymentProvider(settings))
+    restarted = PaymentService(settings, StripePaymentProvider(settings))
     restarted.process_pending_emails()
     assert len(messages) == 1
 
@@ -141,7 +146,7 @@ def test_smtp_failure_preserves_payment_and_retries_without_pii_in_logs(email_fl
 
 def test_restart_recovery_queues_only_after_confirmed_donor_is_recovered(email_flow):
     service, settings, response, request, event, _, messages = email_flow
-    restarted = PaymentService(settings, MockPaymentProvider(settings))
+    restarted = PaymentService(settings, StripePaymentProvider(settings))
     with pytest.raises(HTTPException) as error:
         restarted.finalize_after_restart(response.donation_id, response.status_token, DonationFinalizeRequest(donor=request.donor))
     assert error.value.status_code == 409
@@ -223,7 +228,6 @@ def test_lifespan_runs_the_email_worker_without_smtp_in_the_webhook(email_flow, 
     service.apply_provider_event(event)
     from backend.app import config
     monkeypatch.setattr(config.settings, "data_dir", settings.data_dir)
-    monkeypatch.setattr(config.settings, "payment_provider", "mock")
     monkeypatch.setattr(config.settings, "email_enabled", False)
     from backend.app import main
     monkeypatch.setattr(main, "service", service)

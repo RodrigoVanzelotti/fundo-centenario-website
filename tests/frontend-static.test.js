@@ -14,13 +14,14 @@ for (const label of [
   'Masterclasses e conteúdo Alumni',
   'Contribuição geral',
   'Pix pontual',
-  'Pix Automático',
   'Cartão de crédito',
   'Contribuição mensal no cartão',
 ]) {
   assert(html.includes(label), `Missing UI label: ${label}`);
 }
 
+assert(!html.includes('pix_automatico'));
+assert(!html.includes('mockConfirmButton'));
 assert(js.includes('/api/donations/intents'));
 assert(js.includes('/api/donations/options'));
 assert(js.includes('/status'));

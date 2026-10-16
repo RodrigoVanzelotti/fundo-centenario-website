@@ -30,7 +30,7 @@ def integration(tmp_path, monkeypatch):
     settings = Settings(
         data_dir=tmp_path, public_base_url="http://localhost:8000", app_env="development",
         stripe_secret_key="sk_test_example", stripe_webhook_secret="whsec_test_only",
-        stripe_api_version="2026-09-30.endive", stripe_live_mode=False,
+        stripe_api_version="2026-09-30.endive",
     )
     requests = []
     real_client = httpx.AsyncClient
@@ -206,9 +206,8 @@ def test_webhook_before_browser_return_and_restart_recovery(integration):
 
 def test_stripe_recurring_method_is_card_only(integration):
     service, _, settings, _, requests, _ = integration
-    with pytest.raises(HTTPException) as error:
-        asyncio.run(service.create_intent(payload("pix_automatico")))
-    assert error.value.status_code == 422
+    with pytest.raises(ValidationError):
+        payload("pix_automatico")
     assert len(requests) == 1
 
 
@@ -254,14 +253,29 @@ def test_boundary_validation_rejects_fractional_cents():
 
 
 @pytest.mark.parametrize("setting,value", [
-    ("stripe_secret_key", "sk_live_wrong_mode"), ("stripe_webhook_secret", ""),
-    ("app_env", "production"),
+    ("stripe_secret_key", "pk_test_public"), ("stripe_webhook_secret", ""),
+    ("stripe_secret_key", "sk_live_requires_https"),
 ])
 def test_unsafe_configuration_is_rejected(integration, setting, value):
     _, _, settings, _, _, _ = integration
     setattr(settings, setting, value)
     with pytest.raises(ValueError):
         StripePaymentProvider(settings)
+
+
+@pytest.mark.parametrize("app_env", ["development", "staging", "production"])
+@pytest.mark.parametrize("key", ["sk_test_synthetic", "rk_test_synthetic", "sk_live_synthetic", "rk_live_synthetic"])
+def test_injected_key_defines_stripe_mode_in_every_environment(app_env, key):
+    settings = Settings(app_env=app_env, public_base_url="https://fund.example.org",
+                        stripe_secret_key=key, stripe_webhook_secret="whsec_synthetic")
+    provider = StripePaymentProvider(settings)
+    live = "_live_" in key
+    assert provider.live_mode is live
+    data = {"id": "evt_unrelated", "type": "unrelated.event", "livemode": live}
+    assert asyncio.run(provider.parse_webhook(*signed(settings, data))) is None
+    data["livemode"] = not live
+    with pytest.raises(PermissionError):
+        asyncio.run(provider.parse_webhook(*signed(settings, data)))
 
 
 @pytest.mark.parametrize("update", [
@@ -294,7 +308,6 @@ def test_api_endpoints_and_secrets_are_not_exposed(integration, monkeypatch):
     # Import the application with isolated storage; tests must never write to backend/data.
     from backend.app import config
     monkeypatch.setattr(config.settings, "data_dir", settings.data_dir)
-    monkeypatch.setattr(config.settings, "payment_provider", "mock")
     from backend.app import main
     monkeypatch.setattr(main, "provider", service.provider)
     monkeypatch.setattr(main, "service", service)

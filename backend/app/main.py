@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import time
+import uuid
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
@@ -46,28 +49,40 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Fundo Centenário Payments",
     version="1.0.0",
-    docs_url="/api/docs" if settings.app_env != "production" else None,
+    docs_url="/api/docs" if settings.app_env not in {"production", "staging"} else None,
     redoc_url=None,
     openapi_url=None if settings.app_env in {"production", "staging"} else "/openapi.json",
     lifespan=lifespan,
 )
 
+request_logger = logging.getLogger("fundo.requests")
+request_logger.setLevel(logging.INFO)
+request_logger.propagate = False
+if not request_logger.handlers:
+    request_logger.addHandler(logging.StreamHandler())
+
 
 @app.middleware("http")
 async def request_security(request: Request, call_next):
+    started = time.monotonic()
+    request_id = uuid.uuid4().hex
+    response = None
     if request.method in {"POST", "PUT", "PATCH"}:
         limit = 1_048_576 if request.url.path.startswith("/api/webhooks/") else 32_768
         body = bytearray()
         async for chunk in request.stream():
+            if len(body) + len(chunk) > limit:
+                response = JSONResponse({"detail": "Requisição excede o tamanho permitido."}, status_code=413)
+                break
             body.extend(chunk)
-            if len(body) > limit:
-                return JSONResponse({"detail": "Requisição excede o tamanho permitido."}, status_code=413)
         request._body = bytes(body)
     try:
-        response = await call_next(request)
+        if response is None:
+            response = await call_next(request)
     except Exception as exc:
         # Never log request bodies or SDK exceptions that may contain credentials/PII.
-        logging.getLogger(__name__).error("Requisição falhou (%s).", type(exc).__name__)
+        request_logger.error(json.dumps({"severity": "ERROR", "message": "request_failed",
+                                         "request_id": request_id, "error_type": type(exc).__name__}))
         response = JSONResponse({"detail": "Serviço temporariamente indisponível."}, status_code=503)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -83,6 +98,13 @@ async def request_security(request: Request, call_next):
         )
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Request-ID"] = request_id
+    route = request.scope.get("route")
+    request_logger.info(json.dumps({"severity": "ERROR" if response.status_code >= 500 else "INFO",
+                                   "message": "http_request", "request_id": request_id,
+                                   "route": getattr(route, "path", "unmatched"),
+                                   "method": request.method, "status": response.status_code,
+                                   "duration_ms": round((time.monotonic() - started) * 1000, 2)}))
     return response
 
 if settings.cors_origins:

@@ -72,7 +72,7 @@ O backend mantém também `payment_confirmations.jsonl`, que não contém nome, 
 
 ## Produção: Cloud Run e Firestore
 
-A aplicação está preparada para persistência externa no Firestore e CI/CD pelo GitHub Actions. O procedimento completo de Google Cloud, Firebase, identidades, segredos, primeiro deploy, Scheduler, migração e rollback está em [DEPLOYMENT.md](DEPLOYMENT.md). Staging e produção exigem Firestore. A pipeline seleciona as credenciais Stripe de cada ambiente. Frontend e API continuam na mesma imagem e origem.
+A aplicação está preparada para persistência externa no Firestore e CI/CD pelo GitHub Actions. O procedimento completo de Google Cloud, Firebase, identidades, segredos, primeiro deploy, Scheduler, migração e rollback está em [DEPLOYMENT.md](DEPLOYMENT.md). Staging e produção exigem Firestore. A pipeline seleciona as credenciais Stripe de cada ambiente. Firebase Hosting serve o frontend estático e encaminha `/api/**` ao Cloud Run na mesma origem; o container preserva o frontend para desenvolvimento local.
 
 Em produção, intenções guardam somente dados de pagamento e autenticação, sem nome/email/CPF. O cadastro é enviado pelo navegador a `/finalize` depois da confirmação validada. Confirmações, faturas e pedidos de email são gravados em transação; o Scheduler processa uma outbox com leases e retries, sem depender de um worker permanente.
 

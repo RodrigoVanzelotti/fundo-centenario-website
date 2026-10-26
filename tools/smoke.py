@@ -10,10 +10,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("url")
     parser.add_argument("--production", action="store_true")
+    parser.add_argument("--api-only", action="store_true", help="Check a Cloud Run API candidate without static pages")
     args = parser.parse_args()
     base = args.url.rstrip("/")
     headers = {"Authorization": "Bearer " + os.environ["SMOKE_ID_TOKEN"]} if os.getenv("SMOKE_ID_TOKEN") else {}
-    for path in ("/api/health", "/api/ready", "/", "/como-apoiar/", "/api/donations/options"):
+    paths = ("/api/health", "/api/ready", "/api/donations/options")
+    if not args.api_only:
+        paths += ("/", "/como-apoiar/")
+    for path in paths:
         with urlopen(Request(base + path, headers=headers), timeout=20) as response:
             assert response.status == 200, path
             assert response.headers["X-Content-Type-Options"] == "nosniff", path
@@ -32,6 +36,14 @@ def main():
             assert error.code == 404, path
         else:
             raise AssertionError("Unexpected public resource: " + path)
+    # A rejected webhook exercises POST/body/query forwarding without writing payment data.
+    try:
+        urlopen(Request(base + "/api/webhooks/stripe?smoke=1", data=b"{}", headers=headers), timeout=20).close()
+    except HTTPError as error:
+        assert error.code == 401, "Unsigned webhook must be rejected"
+        assert error.headers["Cache-Control"] == "no-store"
+    else:
+        raise AssertionError("Unsigned webhook accepted")
     print("HTTP smoke check passed")
 
 

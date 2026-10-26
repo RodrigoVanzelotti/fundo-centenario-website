@@ -1,18 +1,21 @@
 # Relatório de benefícios e custos de infraestrutura
+
 **Fundo Centenário da UFRGS**
 
-**Autor:** Rodrigo Vanzelotti
 **Referência:** Outubro de 2026  
 **Domínio:** fundocentenario.com.br  
-**Escopo:** Google for Nonprofits, Google Workspace, Firebase Hosting, Cloud Run e Firestore.
+**Região de processamento e dados:** `southamerica-east1` — São Paulo, Brasil  
+**Arquitetura:** Firebase Hosting + Cloud Run + Cloud Firestore Standard
 
 ---
 
 ## 1. Benefícios do Google for Nonprofits
 
-O Fundo Centenário, constituído como associação ou fundação privada sem fins lucrativos e vinculado à UFRGS, apresenta características compatíveis com os critérios de elegibilidade do Google for Nonprofits.
+O Fundo Centenário, constituído como associação ou fundação privada sem fins lucrativos, apresenta características compatíveis com os critérios de elegibilidade do Google for Nonprofits.
 
-Embora universidades públicas não sejam elegíveis diretamente, o Google permite a participação de braços filantrópicos de instituições educacionais. A aprovação depende de verificação documental pela Goodstack.
+Embora universidades não sejam elegíveis diretamente, o Google admite braços filantrópicos vinculados a instituições educacionais.
+
+A aprovação depende da verificação documental pela Goodstack.
 
 **Referência:** [Google for Nonprofits — Critérios de elegibilidade no Brasil](https://support.google.com/nonprofits/answer/3215869?co=GENIE.CountryCode%3DBR&hl=pt-BR)
 
@@ -20,266 +23,436 @@ Embora universidades públicas não sejam elegíveis diretamente, o Google permi
 
 | Benefício | Concessão | Aplicação no Fundo | Referência oficial |
 |---|---|---|---|
-| Google Workspace for Nonprofits | Gratuito, para até 2.000 usuários elegíveis | E-mails institucionais e organização interna | [Google Workspace](https://support.google.com/nonprofits/answer/2858465?hl=pt-BR) |
-| Armazenamento Google Workspace | 100 TB compartilhados entre os usuários | Documentos, relatórios e arquivos institucionais | [Recursos do Workspace](https://www.google.com/nonprofits/offerings/workspace/?hl=pt-br) |
-| Google Ad Grants | Até US$ 10.000/mês em anúncios de pesquisa | Divulgação e captação de doadores | [Google Ad Grants](https://www.google.com/intl/pt-BR/nonprofits/offerings/google-ad-grants/) |
-| Google Maps Platform | US$ 250/mês em créditos, com possibilidade de solicitar créditos adicionais | Mapas de projetos e iniciativas | [Créditos Google Maps](https://support.google.com/nonprofits/answer/3367237?hl=pt-br) |
-| YouTube Nonprofit Program | Recursos de divulgação, links externos e suporte específico | Divulgação institucional | [Programa YouTube](https://www.google.com/nonprofits/offerings/youtube-nonprofit-program/) |
-| Workspace Business Standard | 75% de desconto sobre o preço padrão | Gravação de reuniões e colaboração avançada | [Planos e preços](https://www.google.com/nonprofits/workspace/compare/?hl=pt-br) |
-| Workspace Business Plus | 72% de desconto sobre o preço padrão | Retenção, auditoria e segurança | [Planos e preços](https://www.google.com/nonprofits/workspace/compare/?hl=pt-br) |
+| Google Workspace for Nonprofits | Gratuito, para até 2.000 usuários | E-mails institucionais e organização interna | [Workspace](https://support.google.com/nonprofits/answer/2858465?hl=pt-BR) |
+| Armazenamento Workspace | 100 TB compartilhados | Documentação, relatórios e arquivos institucionais | [Planos Workspace](https://www.google.com/nonprofits/offerings/workspace/?hl=pt-br) |
+| Google Ad Grants | Até US$ 10.000/mês em anúncios de pesquisa | Divulgação e captação de doadores | [Ad Grants](https://support.google.com/nonprofits/answer/1332166?hl=pt-br) |
+| Google Maps Platform | US$ 250/mês em créditos, com solicitação de créditos adicionais | Mapas de projetos e iniciativas apoiadas | [Créditos Maps](https://support.google.com/nonprofits/answer/3367237?hl=pt-br) |
+| YouTube Nonprofit Program | Recursos de divulgação e suporte específico | Comunicação e divulgação institucional | [YouTube Nonprofits](https://www.google.com/intl/pt-BR/nonprofits/offerings/youtube-nonprofit-program/) |
+| Workspace Business Standard | Desconto de 75% | Colaboração e gravação de reuniões | [Preços Workspace](https://www.google.com/nonprofits/workspace/compare/?hl=pt-br) |
+| Workspace Business Plus | Desconto de 72% | Segurança, retenção e auditoria | [Preços Workspace](https://www.google.com/nonprofits/workspace/compare/?hl=pt-br) |
 
-Os benefícios dependem da aprovação da organização e da ativação individual dos produtos. Os créditos do Google Maps Platform não podem ser utilizados para custear serviços gerais de Google Cloud.
+Os benefícios dependem da elegibilidade, da disponibilidade regional e da ativação individual dos programas.
 
-O YouTube Giving, especificamente, possui restrições de elegibilidade para organizações registradas nos Estados Unidos.
+Os créditos do Google Maps não podem ser utilizados para custear Cloud Run, Firestore ou Firebase Hosting.
 
-### 1.2. Google Workspace já existente
+### 1.2. Google Workspace existente
 
 O Fundo Centenário já utiliza Google Workspace com o domínio `@fundocentenario.com.br`.
 
-Não é necessário criar uma nova estrutura de e-mails para aderir ao programa. A organização pode solicitar a ativação do Google Workspace for Nonprofits na estrutura existente, verificando a assinatura e os procedimentos exigidos pelo Google.
+Após a aprovação no Google for Nonprofits, será possível solicitar a conversão da assinatura existente para uma edição nonprofit compatível, respeitando as condições do contrato atual.
 
-Caso utilize uma versão paga, poderá solicitar a conversão para a edição gratuita ou aplicar os descontos destinados às organizações elegíveis.
+A migração não exige necessariamente a substituição dos endereços de e-mail ou do domínio institucional.
 
-**Impacto financeiro:** redução ou eliminação das mensalidades do Workspace, conforme o plano atualmente contratado.
+**Impacto financeiro:** redução ou eliminação das mensalidades do Workspace.
 
 ### 1.3. Google Ad Grants
 
-O programa disponibiliza até US$ 10.000 mensais em anúncios de texto na Pesquisa Google.
+O benefício de até US$ 10.000/mês pode ser utilizado para ampliar a visibilidade das iniciativas do Fundo Centenário, atrair potenciais doadores e divulgar projetos financiados.
 
-Para o Fundo Centenário, isso pode ampliar a aquisição de visitantes interessados em apoiar a universidade, financiar projetos, participar de iniciativas filantrópicas e conhecer os resultados do fundo patrimonial.
+O orçamento é disponibilizado para publicidade de pesquisa, sujeito às regras de qualidade, segmentação e conversão do programa.
 
-O benefício não representa dinheiro depositado na conta da organização e não pode ser utilizado para pagar hospedagem ou outros serviços da Google Cloud.
+Não representa uma concessão em dinheiro e não pode pagar infraestrutura Cloud.
 
-**Impacto financeiro:** potencial economia em publicidade digital, condicionada às regras do programa.
+**Impacto indireto:** o sucesso das campanhas pode aumentar o tráfego e os custos variáveis de hospedagem.
 
-### 1.4. Créditos para Google Cloud
+### 1.4. Google Cloud e créditos promocionais
 
-Não foi identificado um programa público geral que garanta créditos recorrentes de Cloud Run, Firebase Hosting ou Firestore exclusivamente pela condição de organização nonprofit.
+Não foi identificada uma concessão pública geral de créditos recorrentes de Cloud Run ou Firestore especificamente para organizações nonprofit.
 
-O Google disponibiliza um crédito promocional de US$ 300 por 90 dias para novos clientes elegíveis, além do Free Tier recorrente para serviços selecionados.
+O Google Cloud oferece:
 
-**Referência:** [Google Cloud Free Program](https://docs.cloud.google.com/free/docs/free-cloud-features?hl=pt-br)
+- Free Tier recorrente de determinados serviços.
+- Créditos promocionais de US$ 300 por 90 dias para novos clientes elegíveis.
+- Possibilidade de créditos adicionais por programas específicos, sem garantia de aprovação.
 
-Para o planejamento de longo prazo, este relatório desconsidera créditos promocionais temporários.
+**Referência:** [Google Cloud Free Program](https://cloud.google.com/free/docs/free-cloud-features)
+
+Este relatório considera apenas os benefícios gratuitos recorrentes, sem deduzir créditos temporários.
 
 ---
 
-## 2. Infraestrutura de software proposta
+## 2. Arquitetura proposta
 
-A arquitetura considera os seguintes componentes:
+### 2.1. Região de implantação
 
-| Componente | Tecnologia | Função |
+A configuração recomendada é:
+
+| Componente | Localização | Justificativa |
 |---|---|---|
-| Website | Firebase Hosting | Hospedagem estática, CDN e HTTPS |
-| API | Cloud Run + Python/FastAPI | Processamento de requisições |
-| Banco de dados | Cloud Firestore Standard | Armazenamento de registros |
-| Domínio | fundocentenario.com.br | Identidade e acesso público |
-| Observabilidade | Cloud Logging / Monitoring | Logs, métricas e alertas |
+| Frontend — Firebase Hosting | CDN global | Distribuição eficiente de arquivos estáticos |
+| Backend — Cloud Run | `southamerica-east1` | Processamento regional próximo aos usuários |
+| Banco — Firestore Standard | `southamerica-east1` | Persistência regional e comunicação de baixa latência com o backend |
+| Artifact Registry | `southamerica-east1` | Armazenamento regional das imagens de containers |
+| Domínio | fundocentenario.com.br | Domínio institucional existente |
 
-A arquitetura utilizará serviços gerenciados e execução sob demanda, evitando manter servidores permanentemente ligados.
+A hospedagem estática permanece global, enquanto backend e persistência são implantados em São Paulo.
 
-### 2.1. Tráfego estimado
+O Firebase Hosting suporta o encaminhamento de rotas para Cloud Run na região `southamerica-east1`.
 
-**Base histórica de referência**
+A comunicação entre o Cloud Run e o Firestore na mesma região evita custos de transferência entre regiões, além de favorecer uma menor latência interna.
 
-Foi considerada a análise de acessos do website do Fundo Centenário no período de **janeiro de 2021 a outubro de 2026**, sendo outubro de 2026 um mês ainda em andamento.
+**Referências:**
 
-A média histórica geral identificada é de **339 visitantes por mês**, arredondada para **350 visitantes mensais** para facilitar a modelagem e a apresentação das estimativas.
+- [Firebase Hosting + Cloud Run](https://firebase.google.com/docs/hosting/cloud-run)
+- [Cloud Run — Regiões](https://docs.cloud.google.com/run/docs/locations)
+- [Firestore — Regiões](https://firebase.google.com/docs/firestore/locations)
+- [Cloud Run — Boas práticas de rede](https://docs.cloud.google.com/run/docs/configuring/networking-best-practices)
 
-A análise também identificou uma tendência de aumento expressivo de acessos no final do ano, especialmente em dezembro.
+### 2.2. Tráfego histórico utilizado
 
-Em dezembro de 2025, foram registrados **1.196 visitantes**, representando aproximadamente 3,42 vezes o volume de referência arredondado.
+O levantamento considera os acessos ao website do Fundo Centenário entre **janeiro de 2021 e outubro de 2026**, com outubro ainda em andamento.
 
-Dessa forma, o cenário pessimista de capacidade e custos utilizará o pico histórico de 1.196 visitantes mensais, enquanto o cenário médio utilizará 350.
+A média histórica foi de **339 visitantes mensais**, arredondada para **350 visitantes** como base operacional.
 
-**Premissas de utilização**
+Observa-se uma tendência de aumento expressivo de acessos no final do ano. Em dezembro de 2025, foram registrados **1.196 visitantes**.
 
-| Indicador | Cenário médio | Cenário pessimista |
+Este volume será utilizado como cenário pessimista histórico.
+
+| Indicador | Médio | Pessimista |
 |---|---:|---:|
-| Visitantes mensais | 350 | 1.196 |
+| Visitantes/mês | 350 | 1.196 |
 | Páginas por visitante | 5 | 15 |
 | Transferência por página | 1,5 MB | 4 MB |
 | Visualizações de páginas | 1.750 | 17.940 |
-| Transferência estática mensal | 2,63 GB | 71,76 GB |
-| Usuários que realizam chamadas à API | 25 | ~85 |
+| Transferência estática | 2,63 GB | 71,76 GB |
+| Usuários que utilizam a API | 25 | ~85 |
 | Requisições por usuário ativo | 10 | 100 |
 | Requisições de API | 250 | ~8.543 |
 | Leituras Firestore | 1.000 | ~85.429 |
 | Gravações Firestore | 250 | ~8.543 |
-| Armazenamento Firestore | 50 MB | ~1,71 GB* |
 
-\*O armazenamento pessimista é uma extrapolação matemática dos 500 MB anteriormente previstos para o cenário de maior utilização. O armazenamento real depende da retenção dos dados, não apenas da quantidade de visitantes no mês.
+O fator proporcional utilizado é:
 
-As estimativas operacionais pessimistas foram escaladas proporcionalmente ao crescimento dos visitantes, mantendo as hipóteses conservadoras de maior navegação e quantidade de chamadas por usuário.
+**1.196 ÷ 350 = 3,417**
 
-**Fator de crescimento aplicado:** 1.196 ÷ 350 = 3,417.
+As métricas pessimistas de utilização foram construídas com esse crescimento e hipóteses conservadoras de aumento de navegação e operações por usuário.
 
-Exemplos:
+### 2.3. Armazenamento
 
-- Usuários de API: 25 × 3,417 ≈ 85.
-- Chamadas de API: 2.500 × 3,417 ≈ 8.543.
-- Leituras Firestore: 25.000 × 3,417 ≈ 85.429.
-- Gravações Firestore: 2.500 × 3,417 ≈ 8.543.
+O armazenamento não pode ser projetado exclusivamente pelo número de visitantes, pois registros podem permanecer no banco durante vários anos.
 
-O cenário pessimista representa um pico de tráfego fundamentado no histórico do próprio site, e não um limite máximo absoluto de utilização.
+Para o planejamento:
+
+| Cenário | Armazenamento considerado |
+|---|---:|
+| Médio inicial | 50 MB |
+| Pico com registros pequenos | ~171 MB |
+| Estresse conservador de armazenamento | ~1,71 GB |
+
+O último cenário extrapola proporcionalmente a hipótese anterior de 500 MB de armazenamento elevado para 350 visitantes.
+
+Ele representa uma simulação conservadora, e não uma medição histórica ou previsão garantida.
 
 ---
 
-## 3. Benefícios gratuitos da Google Cloud aplicados à infraestrutura
-
-As franquias abaixo não dependem de aprovação no Google for Nonprofits.
-
-| Serviço | Franquia gratuita | Utilização pessimista |
-|---|---|---|
-| Firebase Hosting | 10 GB de armazenamento | Dentro do limite presumido |
-| Firebase Hosting | 10 GB/mês de transferência, conforme documentação técnica | 71,76 GB/mês |
-| Cloud Run | 2 milhões de requisições/mês | ~8.543 |
-| Cloud Run | 180.000 vCPU-segundos/mês* | ~3.417 |
-| Firestore | 50.000 leituras/dia | ~2.756/dia |
-| Firestore | 20.000 gravações/dia | ~276/dia |
-| Firestore | 1 GiB de armazenamento | ~1,63–1,67 GiB |
-| SSL e domínio personalizado | Incluídos no Firebase Hosting | Sem cobrança específica |
-
-\*As cotas de CPU e memória do Cloud Run são referenciadas à região `us-central1`. O consumo real depende da configuração e da região.
-
-Referências oficiais:
-
-- [Firebase Hosting — Cotas e preços](https://firebase.google.com/docs/hosting/usage-quotas-pricing?hl=pt)
-- [Cloud Run Pricing](https://cloud.google.com/run/pricing)
-- [Firestore Pricing](https://cloud.google.com/firestore/pricing)
+## 3. Como São Paulo altera os custos
 
 ### 3.1. Firebase Hosting
 
+O Firebase Hosting utiliza CDN global, e sua tabela de preços não varia conforme a região escolhida para o backend.
+
+A documentação técnica informa:
+
+| Recurso | Franquia / tarifa |
+|---|---|
+| Armazenamento | 10 GB gratuitos |
+| Armazenamento excedente | US$ 0,026/GB |
+| Transferência de dados | 10 GB/mês gratuitos |
+| Transferência excedente | US$ 0,15/GB |
+| SSL e domínio personalizado | Incluídos |
+
+A página resumida de preços também apresenta a transferência gratuita como 360 MB/dia. Para a estimativa mensal com faturamento Blaze, utiliza-se a regra de 10 GB/mês descrita na documentação técnica de Hosting.
+
+**Referência:** [Firebase Hosting — Cotas e preços](https://firebase.google.com/docs/hosting/usage-quotas-pricing?hl=pt-br)
+
 **Cenário médio**
 
-350 visitantes × 5 páginas × 1,5 MB = **2,63 GB/mês**.
+350 × 5 × 1,5 MB = 2,625 GB/mês.
 
-A transferência permanece dentro da franquia gratuita.
+Transferência abaixo da franquia gratuita.
 
-Custo estimado: **US$ 0,00/mês**.
+**Custo: US$ 0,00.**
 
-**Cenário pessimista — dezembro de 2025 como referência**
+**Cenário pessimista**
 
-1.196 visitantes × 15 páginas × 4 MB = **71,76 GB/mês**.
+1.196 × 15 × 4 MB = 71,76 GB/mês.
 
-Considerando 10 GB/mês de transferência gratuita:
+Transferência excedente: 61,76 GB.
 
-- Transferência total: 71,76 GB.
-- Transferência excedente: 61,76 GB.
-- Tarifa de referência: US$ 0,15/GB.
+61,76 × US$ 0,15 = **US$ 9,26/mês**.
 
-Custo calculado: **US$ 9,26/mês**.
+Portanto, a mudança de região do backend não modifica diretamente a estimativa de custo do frontend estático.
 
-A tabela resumida de preços do Firebase também apresenta uma referência de 360 MB/dia. Em uma distribuição diária desfavorável, a cobrança calculada por essa referência poderia chegar a aproximadamente US$ 10,71.
+### 3.2. Cloud Run — São Paulo
 
-Para o orçamento, adota-se US$ 9,26 como cálculo mensal de referência, destacando a necessidade de conferir a franquia efetivamente aplicada à conta.
+O Cloud Run apresenta preços diferentes conforme a região.
 
-### 3.2. Cloud Run
+A franquia gratuita do modelo de cobrança por requisição é aplicada como um desconto financeiro baseado nos preços de `us-central1`.
 
-O backend continuará processando um volume relativamente pequeno de requisições, mesmo no pico histórico.
+Valores publicados para essa referência:
 
-Para aproximadamente 8.543 chamadas mensais, assumindo 400 ms de processamento por chamada e 1 vCPU, o consumo estimado será de aproximadamente 3.417 vCPU-segundos.
+| Recurso | Referência mensal gratuita |
+|---|---:|
+| CPU | Equivalente a 180.000 vCPU-segundos |
+| Memória | Equivalente a 360.000 GiB-segundos |
+| Requisições | 2 milhões |
 
-Esse consumo permanece consideravelmente abaixo da franquia de referência de 180.000 vCPU-segundos mensais.
+Em São Paulo, a tarifa regional determina a quantidade efetiva de processamento coberta pelo desconto.
 
-Com zero instâncias mínimas, faturamento baseado em requisições e ausência de processos permanentes:
+**Premissas de execução:**
 
-**Custo médio: US$ 0,00/mês.**
+- Backend Python/FastAPI.
+- 1 vCPU.
+- 512 MiB de memória.
+- 400 ms de execução por requisição.
+- Zero instâncias mínimas.
+- Faturamento baseado em requisições.
+- Sem processamento contínuo em background.
 
-**Custo pessimista estimado: US$ 0,00/mês.**
+**Cenário médio**
 
-### 3.3. Firestore
+250 requisições × 0,4 segundo = 100 vCPU-segundos.
 
-Mesmo no cenário de maior utilização, as operações de leitura e gravação permanecem muito abaixo das cotas diárias.
+Consumo aproximado de memória: 50 GiB-segundos.
 
-Entretanto, a extrapolação de armazenamento para aproximadamente 1,71 GB ultrapassa a franquia gratuita de 1 GiB.
+**Cenário pessimista**
 
-Utilizando uma tarifa ilustrativa de US$ 0,15/GiB-mês para armazenamento excedente, na região de referência `us-central1`, e considerando que todo o volume permaneça armazenado durante o mês:
+8.543 requisições × 0,4 segundo = 3.417 vCPU-segundos.
 
-**Custo pessimista estimado de armazenamento: aproximadamente US$ 0,10/mês.**
+Consumo aproximado de memória: 1.709 GiB-segundos.
 
-As operações de leitura e gravação continuariam sem custo dentro das franquias gratuitas.
+Esses cálculos não incluem inicialização de containers nem outros tempos auxiliares faturáveis. Ainda assim, existe ampla margem dentro do desconto gratuito, mesmo considerando a diferença regional.
+
+**Custo de processamento esperado: US$ 0,00/mês.**
+
+Isso é uma projeção, não uma garantia de faturamento zero.
+
+O Cloud Run poderá apresentar custos de transferência de dados de saída para a Internet, inclusive com tráfego destinado a usuários brasileiros.
+
+A transferência entre Cloud Run e Firestore na mesma região não gera a mesma cobrança de transferência inter-regional.
+
+**Referência:** [Cloud Run Pricing](https://cloud.google.com/run/pricing)
+
+### 3.3. Firestore Standard — São Paulo
+
+O Firestore possui preços regionais para armazenamento e operações.
+
+As franquias gratuitas publicadas para um banco elegível são:
+
+| Recurso | Franquia |
+|---|---:|
+| Armazenamento | 1 GiB |
+| Leituras | 50.000/dia |
+| Gravações | 20.000/dia |
+| Exclusões | 20.000/dia |
+| Transferência de saída | 10 GiB/mês |
+
+Essas franquias permanecem aplicáveis ao banco elegível implantado em São Paulo.
+
+**Cenário médio**
+
+1.000 leituras e 250 gravações por mês, com 50 MB armazenados.
+
+Custo estimado: **US$ 0,00**.
+
+**Cenário pessimista operacional**
+
+85.429 leituras e 8.543 gravações mensais.
+
+Distribuídas por 31 dias, representam aproximadamente:
+
+- 2.756 leituras/dia.
+- 276 gravações/dia.
+
+Ambas permanecem muito abaixo das cotas gratuitas.
+
+**Cenário conservador de armazenamento**
+
+Com 1,71 GB armazenados, haveria aproximadamente 0,6–0,7 GiB acima da franquia, dependendo da unidade utilizada e do armazenamento efetivamente faturado.
+
+O valor pago dependerá da tarifa de armazenamento de `southamerica-east1`, do uso médio diário, dos índices e dos metadados.
+
+Para o orçamento preliminar, será adotada uma **provisão de US$ 0,15–0,50/mês**, que não representa uma cotação oficial da tarifa regional. O preço definitivo deverá ser confirmado na calculadora do Google Cloud antes do deploy.
+
+**Referência:** [Firestore Pricing — selecionar São Paulo](https://cloud.google.com/firestore/pricing)
+
+### 3.4. Transferência de rede
+
+Ao centralizar o backend e o banco em `southamerica-east1`, evitamos transferências inter-regionais entre esses componentes.
+
+Entretanto, continuam existindo fluxos que podem ser faturados:
+
+| Comunicação | Tratamento |
+|---|---|
+| Firebase Hosting → navegador | Cobrança de transferência do Hosting |
+| Cloud Run → Firestore na mesma região | Sem tarifa de transferência inter-regional |
+| Cloud Run → usuários externos | Sujeito a preços de saída de rede |
+| Firestore → outras regiões | Pode gerar cobranças adicionais |
+| Artifact Registry → Cloud Run | Depende da localização e regras aplicáveis |
+
+Como o projeto utiliza uma API de baixa volumetria, o tráfego externo previsto será pequeno.
+
+Para ilustrar, supondo 50 KB de resposta por requisição no cenário pessimista:
+
+8.543 × 50 KB ≈ 427 MB/mês.
+
+A cobrança efetiva dependerá da origem, do destino e de como as respostas forem entregues pelo Hosting e Cloud Run.
+
+Não será assumida uma franquia gratuita norte-americana para tráfego originado em São Paulo.
 
 ---
 
-## 4. Consolidação dos custos mensais
+## 4. Consolidação financeira
 
-| Serviço | Cenário médio | Cenário pessimista |
+### 4.1. Estimativa técnica mensal
+
+| Serviço | Médio | Pessimista |
 |---|---:|---:|
 | Firebase Hosting | US$ 0,00 | US$ 9,26 |
-| Cloud Run | US$ 0,00 | US$ 0,00 |
+| Cloud Run — CPU/RAM/requisições | ~US$ 0,00 | ~US$ 0,00 |
 | Firestore — operações | US$ 0,00 | US$ 0,00 |
-| Firestore — armazenamento | US$ 0,00 | ~US$ 0,10 |
-| SSL e CDN | Incluídos | Incluídos |
-| Logging e Monitoring básicos | US$ 0,00 | US$ 0,00 |
-| Artifact Registry | US$ 0,00 | ~US$ 0,10 |
-| **Total mensal estimado** | **US$ 0,00** | **US$ 9,46** |
+| Firestore — armazenamento | US$ 0,00 | Provisão de US$ 0,15–0,50 |
+| Transferência de API | Residual | Pequena, variável |
+| Artifact Registry | US$ 0,00 dentro da franquia | ~US$ 0,10, se houver excedente |
+| Logging e Monitoring básicos | US$ 0,00 dentro das franquias | US$ 0,00 dentro das franquias |
+| **Estimativa agregada** | **Próxima de US$ 0,00** | **Aproximadamente US$ 9,50–10,50** |
 
-O total pessimista é uma projeção baseada no pico histórico e nas hipóteses conservadoras de uso. Não corresponde a um teto garantido de gastos.
+O intervalo pessimista inclui provisões de baixa magnitude para tarifas regionais e rede que precisam ser confirmadas no faturamento real.
 
-Não estão incluídos custos de desenvolvimento, renovação de domínio, gateways de pagamento, serviços externos ou tributos.
+Não é um teto máximo e não inclui tributos brasileiros, custos externos nem despesas de manutenção do domínio.
+
+### 4.2. Comparação entre `us-central1` e `southamerica-east1`
+
+| Critério | Iowa | São Paulo |
+|---|---|---|
+| Processamento regional | EUA | Brasil |
+| Preço unitário de Cloud Run | Referência Tier 1 | Tarifa regional própria |
+| Preço Firestore | Tarifa regional dos EUA | Tarifa regional brasileira |
+| Franquia Firestore elegível | Disponível | Disponível |
+| Benefícios nonprofit | Independentes da região | Independentes da região |
+| Firebase Hosting | Global | Global |
+| Latência para a maioria dos usuários brasileiros | Potencialmente maior | Potencialmente menor |
+| Banco regional no Brasil | Não | Sim |
+| Transferência Cloud Run ↔ Firestore na mesma região | Sem transferência inter-regional | Sem transferência inter-regional |
+
+**Conclusão da comparação:** São Paulo é a escolha recomendada para esta aplicação. O diferencial regional de preços tem impacto reduzido diante do baixíssimo consumo de processamento e operações de banco de dados.
+
+A decisão também evita posicionar o banco de dados em uma região distante da API.
 
 ---
 
-## 5. Riscos e despesas adicionais
+## 5. Segurança, localização dos dados e governança
 
-A arquitetura pode gerar custos superiores aos projetados principalmente se forem utilizados:
+A implantação do Firestore em `southamerica-east1` permite utilizar armazenamento regional no Brasil, mas isso não significa que todos os dados e metadados do sistema permanecerão exclusivamente no território nacional.
 
-- Cloud Run com instâncias mínimas permanentemente ativas.
-- Cloud SQL ou outros bancos com recursos provisionados.
-- Load Balancers dedicados.
-- Backups avançados e retenção prolongada de dados.
-- Serviços externos de e-mail ou integração.
-- Processamento de arquivos, imagens ou grandes volumes de dados.
-- Recursos pagos não previstos na arquitetura.
+O Firebase Hosting opera com uma CDN global, e produtos de observabilidade, autenticação ou integrações externas podem possuir regras próprias de localização.
 
-Além disso, o Google Ad Grants poderá aumentar significativamente o tráfego do website, alterando o padrão histórico utilizado neste relatório.
+Para o Fundo Centenário, recomenda-se:
 
-Recomenda-se monitorar especialmente a transferência de dados do Firebase Hosting, por ser o principal componente com potencial de cobrança variável no cenário proposto.
+1. Implantar Cloud Run e Firestore na mesma região.
+2. Escolher a região definitiva do Firestore antes de criar o banco.
+3. Adotar contas de serviço com permissões mínimas.
+4. Evitar armazenar dados pessoais desnecessários em logs.
+5. Definir controles de acesso, retenção, backup e recuperação.
+6. Avaliar as exigências de LGPD aplicáveis aos formulários e dados de doadores.
+
+A localização do Firestore não pode ser simplesmente alterada em um banco existente; uma mudança posterior exigiria um processo de migração.
+
+A replicação entre zonas dentro da região não equivale a recuperação contra a indisponibilidade completa da região. Backups e estratégias de recuperação devem ser definidos de acordo com a criticidade dos dados.
 
 ---
 
-## 6. Recomendação financeira anual
+## 6. Riscos de aumento de custo
 
-| Categoria | Projeção |
+Os principais fatores de risco são:
+
+| Risco | Consequência |
+|---|---|
+| Instâncias mínimas no Cloud Run acima de zero | Cobranças mesmo em períodos sem tráfego |
+| Cloud SQL ou servidores permanentes | Introdução de custos fixos |
+| Load Balancer dedicado | Despesa adicional recorrente |
+| Transferência entre diferentes regiões | Tarifas desnecessárias de rede |
+| Arquivos de página muito grandes | Maior custo de Firebase Hosting |
+| Bots e tráfego automatizado | Consumo não relacionado a visitantes humanos |
+| Backups, PITR e retenção avançada | Cobranças adicionais |
+| Crescimento com Google Ad Grants | Maior número de visitantes e transferência |
+
+Um ponto importante é que a operação em Firebase Blaze exige uma conta de faturamento ativa. As franquias gratuitas continuam existindo, mas o consumo excedente é cobrado.
+
+Alertas de orçamento não interrompem automaticamente a prestação dos serviços nem funcionam como limites rígidos de gastos.
+
+---
+
+## 7. Recomendações de deploy
+
+A configuração operacional recomendada é:
+
+| Parâmetro | Configuração inicial |
+|---|---|
+| Cloud Run region | `southamerica-east1` |
+| Cloud Run CPU | 1 vCPU |
+| Cloud Run memory | 512 MiB |
+| Minimum instances | 0 |
+| Maximum instances | 2 inicialmente |
+| Billing | Request-based |
+| Firestore | Standard, banco elegível à franquia gratuita |
+| Firestore region | `southamerica-east1` |
+| Artifact Registry | `southamerica-east1` |
+| Firebase Hosting | CDN global, domínio institucional |
+| Budget alert | 50%, 80% e 100% do orçamento |
+| Ambiente de produção | Projeto Google Cloud dedicado |
+
+O máximo inicial de duas instâncias deve ser validado por testes e pelos requisitos de disponibilidade do projeto. Limitar a escala protege parcialmente o processamento contra picos inesperados, mas pode aumentar erros ou latência durante eventos de acesso intenso.
+
+Recomenda-se usar Firebase Hosting para o frontend estático e configurar o encaminhamento explícito das rotas de API para a região de São Paulo.
+
+Caso o frontend dependa de SSR, esse modelo deve ser revisado, pois as estimativas pressupõem hospedagem predominantemente estática.
+
+---
+
+## 8. Recomendação financeira anual
+
+| Categoria | Valor |
 |---|---:|
-| Infraestrutura mensal esperada | US$ 0,00 |
-| Infraestrutura em mês de pico histórico | ~US$ 9,46 |
-| Reserva mensal recomendada | US$ 10,00 |
-| **Reserva anual recomendada** | **US$ 120,00** |
+| Custo mensal esperado | Próximo de US$ 0 |
+| Custo em mês de pico histórico conservador | ~US$ 9,50–10,50 |
+| Reserva mensal sugerida | US$ 15,00 |
+| **Reserva anual sugerida** | **US$ 180,00** |
 
-A reserva proposta é prudencial e não representa cobrança mínima ou limite máximo de faturamento.
+A reserva foi ampliada de US$ 120 para US$ 180 anuais, considerando a necessidade de absorver diferenças regionais, transferência adicional e pequenos serviços auxiliares.
 
-Caso o padrão histórico continue, a maioria dos meses deverá gerar custos muito baixos ou nulos, com possibilidade de aumento no período de maior tráfego.
-
-É recomendável configurar alertas de orçamento no Google Cloud e revisar os custos mensalmente, especialmente antes e durante dezembro. Alertas de faturamento não interrompem automaticamente o consumo.
+Essa reserva não representa uma projeção de que todos os meses terão custo de US$ 15. A expectativa continua sendo de consumo baixo na maior parte do ano.
 
 ---
 
-## 7. Conclusão
+## 9. Conclusão
 
-A arquitetura Firebase Hosting + Cloud Run + Firestore permanece economicamente adequada ao perfil de tráfego do Fundo Centenário.
+A utilização da região `southamerica-east1` — São Paulo — é tecnicamente recomendada para o Fundo Centenário da UFRGS.
 
-Com base nos dados históricos analisados entre janeiro de 2021 e outubro de 2026, a estimativa considera:
+A região brasileira permite posicionar o processamento e a persistência próximos ao público esperado, reduzindo a necessidade de comunicação entre regiões e facilitando a definição de políticas de localização de dados.
 
-- Média histórica: 339 visitantes mensais.
-- Média operacional arredondada: 350 visitantes mensais.
-- Pico histórico de referência: 1.196 visitantes em dezembro de 2025.
+Embora Cloud Run e Firestore possuam preços regionais diferentes dos valores de referência dos Estados Unidos, o volume projetado permanece suficientemente baixo para que o impacto financeiro seja pequeno.
 
-**O custo mensal esperado da infraestrutura é próximo de zero**, enquanto um mês com volume semelhante ao pico histórico e com hipóteses conservadoras de navegação pode representar aproximadamente **US$ 9,46** em infraestrutura.
+Com base nos dados históricos de janeiro de 2021 a outubro de 2026:
 
-A adesão ao Google for Nonprofits traz benefícios adicionais, principalmente a possibilidade de reduzir despesas do Google Workspace, centralizar a colaboração institucional e ampliar as iniciativas de captação com Google Ad Grants.
+- **Média histórica:** 339 visitantes mensais.
+- **Média operacional:** 350 visitantes mensais.
+- **Pico histórico:** 1.196 visitantes em dezembro de 2025.
+- **Custo mensal esperado:** próximo de zero.
+- **Custo em cenário pessimista conservador:** aproximadamente US$ 9,50–10,50.
+- **Reserva anual sugerida:** US$ 180.
 
-Assim, a principal vantagem do Google for Nonprofits não está diretamente no custeio da infraestrutura proposta, mas na redução de despesas operacionais e no fortalecimento da comunicação e da captação de recursos do Fundo Centenário.
+Os benefícios do Google for Nonprofits permanecem independentes da região escolhida para os serviços de infraestrutura.
 
-### Fontes oficiais
+A maior oportunidade econômica do programa continua sendo o Google Workspace gratuito e o Google Ad Grants, enquanto a hospedagem do software pode ser mantida economicamente utilizando as franquias gratuitas gerais da Google Cloud.
 
-- [Google for Nonprofits — Elegibilidade no Brasil](https://support.google.com/nonprofits/answer/3215869?co=GENIE.CountryCode%3DBR&hl=pt-BR)
-- [Google Workspace for Nonprofits](https://www.google.com/nonprofits/offerings/workspace/?hl=pt-br)
-- [Google Ad Grants](https://www.google.com/intl/pt-BR/nonprofits/offerings/google-ad-grants/)
-- [Google Cloud Free Program](https://docs.cloud.google.com/free/docs/free-cloud-features?hl=pt-br)
-- [Firebase Pricing](https://firebase.google.com/pricing)
-- [Firebase Hosting — Quotas e preços](https://firebase.google.com/docs/hosting/usage-quotas-pricing)
-- [Cloud Run Pricing](https://cloud.google.com/run/pricing)
-- [Firestore Pricing](https://cloud.google.com/firestore/pricing)
-- [Artifact Registry Pricing](https://cloud.google.com/artifact-registry/pricing)
+### Referências técnicas oficiais
+
+- [Google Cloud — Calculadora de preços](https://cloud.google.com/products/calculator)
+- [Cloud Run — Preços regionais](https://cloud.google.com/run/pricing)
+- [Firestore Standard — Preços por região](https://cloud.google.com/firestore/pricing)
+- [Firebase Hosting — Cotas e preços](https://firebase.google.com/docs/hosting/usage-quotas-pricing)
+- [Firebase Hosting — Integração com Cloud Run](https://firebase.google.com/docs/hosting/cloud-run)
+- [Cloud Run — Regiões disponíveis](https://docs.cloud.google.com/run/docs/locations)
+- [Firestore — Localização de bancos de dados](https://firebase.google.com/docs/firestore/locations)
+- [Google for Nonprofits](https://www.google.com/intl/pt-BR/nonprofits/)

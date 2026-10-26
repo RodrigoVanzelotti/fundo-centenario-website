@@ -40,12 +40,16 @@ jobs:
           curl --silent --fail http://127.0.0.1:8085/ >/dev/null
       - name: Backend and frontend checks
         run: |
+          python -m compileall -q backend tools
           python -m pytest -q
           node tests/frontend-static.test.js
           node tests/donation-steps.test.js
           cp backend/.env.example backend/.env
           docker compose config --quiet
           git diff --check
+          docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.7 -shellcheck=
+      - name: Validate static Hosting with the Firebase emulator
+        run: npx --yes firebase-tools@15.32.1 emulators:exec --only hosting --project demo-fundo-centenario "node tests/hosting.test.js"
       - name: Build and smoke test container
         run: |
           docker build --platform linux/amd64 -t fundo:ci .

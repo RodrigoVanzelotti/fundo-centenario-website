@@ -84,7 +84,7 @@
                     </div>
                     <label class="custom-amount-wrap">
                       <span class="custom-amount-prefix">R$</span>
-                      <input class="custom-amount" id="customAmount" inputmode="decimal" type="number" min="1" max="1000000" step="0.01" placeholder="Outro valor" aria-label="Outro valor de contribuição" />
+                      <input class="custom-amount" id="customAmount" inputmode="decimal" type="number" min="1" max="999999.99" step="0.01" placeholder="Outro valor" aria-label="Outro valor de contribuição" />
                     </label>
                   </div>
 
@@ -201,6 +201,7 @@
                 <p id="paymentStatusMessage">Assim que o Stripe confirmar o pagamento, esta página será atualizada automaticamente.</p>
               </div>
             </div>
+            <button class="button button-outline-dark" id="restartContribution" type="button" hidden>Iniciar nova tentativa</button>
           </section>
 
           <section class="donation-stage success-stage" id="successStage" hidden>

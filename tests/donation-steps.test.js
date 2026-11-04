@@ -10,7 +10,7 @@ assert(!html.includes('??'));
 assert(html.indexOf('id="customAmount"') < html.indexOf('id="donorStep"'));
 assert(html.indexOf('name="program"') < html.indexOf('id="donorName"'));
 
-async function check(method, missingReturnSession = false, optionsFailure = false, restoreLocal = false) {
+async function check(method, missingReturnSession = false, optionsFailure = false, restoreLocal = false, failedPayment = false) {
   const nodes = new Map();
   const node = (selector) => {
     if (!nodes.has(selector)) nodes.set(selector, {
@@ -117,6 +117,11 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
   }
   windowListeners.pageshow({ persisted: true });
   assert.equal(node('#formStatus').hidden, true);
+  node('#customAmount').value = '1000000';
+  node('#customAmount').reportValidity = () => true;
+  await submit();
+  assert.equal(node('#donorStep').hidden, true);
+  assert.equal(intentRequests().length, 0);
   node('#customAmount').value = '250';
   node('#customAmount').reportValidity = () => true;
   await submit();
@@ -152,6 +157,19 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
   assert.equal(node('#successStage').hidden, true);
   assert(requests.some(r => r.redirect === 'https://checkout.stripe.com/c/pay/test'));
   await new Promise(resolve => setImmediate(resolve));
+  if (failedPayment) {
+    status = 'failed';
+    await timers[0]();
+    assert.equal(node('#restartContribution').hidden, false);
+    assert.equal(node('#redirectPaymentView').hidden, true);
+    assert.equal(node('#successStage').hidden, true);
+    node('#restartContribution').listeners.click();
+    assert.equal(node('#restartContribution').hidden, true);
+    assert.equal(node('#paymentStage').hidden, true);
+    assert.equal(node('#contributionStep').hidden, false);
+    assert.equal(node('#donorName').value, 'Test Donor');
+    return;
+  }
   status = 'paid';
   persisted = false;
   failFinalize = true;
@@ -170,5 +188,6 @@ async function check(method, missingReturnSession = false, optionsFailure = fals
   await check('card_recurring', false, true);
   await check('pix', false, false, true);
   await check('card_recurring', false, false, true);
+  await check('pix', false, false, false, true);
   console.log('donation steps: ok');
 })().catch(error => { console.error(error); process.exitCode = 1; });

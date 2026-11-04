@@ -30,7 +30,7 @@ def integration(tmp_path, monkeypatch):
     settings = Settings(
         data_dir=tmp_path, public_base_url="http://localhost:8000", app_env="development",
         stripe_secret_key="sk_test_example", stripe_webhook_secret="whsec_test_only",
-        stripe_api_version="2026-09-30.endive",
+        stripe_api_version="2026-10-28.endive",
     )
     requests = []
     real_client = httpx.AsyncClient
@@ -84,7 +84,8 @@ def test_monthly_checkout_contract_and_no_pii(integration):
     fields = parse_qs(request.content.decode())
     assert str(request.url) == "https://api.stripe.com/v1/checkout/sessions"
     assert fields["mode"] == ["subscription"]
-    assert fields["payment_method_types[0]"] == ["card"]
+    assert fields["allowed_payment_method_types[0]"] == ["card"]
+    assert "payment_method_types[0]" not in fields
     assert fields["line_items[0][price_data][recurring][interval]"] == ["month"]
     assert fields["line_items[0][price_data][currency]"] == ["brl"]
     assert fields["line_items[0][price_data][unit_amount]"] == ["10000"]
@@ -217,6 +218,8 @@ def test_hosted_one_time_checkout(integration, method):
     response = asyncio.run(service.create_intent(payload(method)))
     fields = parse_qs(requests[-1].content.decode())
     assert fields["mode"] == ["payment"]
+    assert fields["allowed_payment_method_types[0]"] == [method]
+    assert "payment_method_types[0]" not in fields
     assert not any(key.startswith("subscription_data") for key in fields)
     metadata = {key[9:-1]: value[0] for key, value in fields.items() if key.startswith("metadata[")}
     data = event(settings, metadata, kind="checkout.session.completed")
@@ -247,9 +250,15 @@ def test_local_store_rolls_back_failed_write_and_rejects_corruption(tmp_path, mo
         JsonlStore(store.path, "id")
 
 
-def test_boundary_validation_rejects_fractional_cents():
+@pytest.mark.parametrize("amount", [99, 100_000_000, 100.5, True])
+def test_boundary_validation_rejects_invalid_amounts(amount):
     with pytest.raises(ValidationError):
-        DonationIntentRequest(**{**payload().model_dump(), "amount_cents": 100.5})
+        DonationIntentRequest(**{**payload().model_dump(), "amount_cents": amount})
+
+
+@pytest.mark.parametrize("amount", [100, 99_999_999])
+def test_boundary_validation_accepts_stripe_amount_limits(amount):
+    assert DonationIntentRequest(**{**payload().model_dump(), "amount_cents": amount}).amount_cents == amount
 
 
 @pytest.mark.parametrize("setting,value", [

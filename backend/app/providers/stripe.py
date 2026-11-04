@@ -42,7 +42,7 @@ class StripePaymentProvider:
         metadata = {**request.metadata, "application": "fundo-centenario", "amount_cents": str(request.amount_cents)}
         data = {
             "mode": "subscription" if recurring else "payment",
-            "payment_method_types[0]": method,
+            "allowed_payment_method_types[0]": method,
             "client_reference_id": request.donation_id,
             "success_url": request.return_url,
             "cancel_url": request.return_url.split("?", 1)[0] + "#contribuir",
@@ -135,7 +135,7 @@ class StripePaymentProvider:
         method = PaymentMethod(metadata["method"])
         program = DonationProgram(metadata["program"])
         expected_amount = int(metadata["amount_cents"])
-        if not 100 <= expected_amount <= 100_000_000:
+        if not 100 <= expected_amount <= 99_999_999:
             raise ValueError("Valor de contribuição inválido.")
         status = "pending"
         amount = None

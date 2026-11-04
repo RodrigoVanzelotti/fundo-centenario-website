@@ -252,7 +252,7 @@ class PaymentService:
             amount_cents = event.amount_cents if event.amount_cents is not None else (known.amount_cents if known else None)
             if not donation_id or not token_hash or not program_raw or not method_raw:
                 raise ValueError("Confirmação sem metadata suficiente.")
-            if type(amount_cents) is not int or not 100 <= amount_cents <= 100_000_000:
+            if type(amount_cents) is not int or not 100 <= amount_cents <= 99_999_999:
                 raise ValueError("Valor de pagamento inválido.")
             if known and amount_cents != known.amount_cents:
                 raise ValueError("Valor do pagamento incompatível.")

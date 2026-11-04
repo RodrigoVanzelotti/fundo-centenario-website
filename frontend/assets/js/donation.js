@@ -25,6 +25,7 @@
   const redirectPaymentView = $("#redirectPaymentView");
   const redirectButton = $("#redirectButton");
   const paymentStatusMessage = $("#paymentStatusMessage");
+  const restartButton = $("#restartContribution");
 
   let selectedAmount = Number(config?.donation?.defaultAmount || 100);
   let activeSession = readSession();
@@ -119,8 +120,8 @@
       if (!customAmount.reportValidity()) return "Informe um valor de contribuição válido.";
       setAmount(customAmount.value);
     }
-    if (!Number.isFinite(selectedAmount) || selectedAmount < 1 || selectedAmount > 1000000) {
-      return "Informe um valor entre R$ 1,00 e R$ 1.000.000,00.";
+    if (!Number.isFinite(selectedAmount) || selectedAmount < 1 || selectedAmount > 999999.99) {
+      return "Informe um valor entre R$ 1,00 e R$ 999.999,99.";
     }
     return null;
   }
@@ -305,6 +306,11 @@
       paymentStatusMessage.textContent = statusData.message;
       if (statusData.status === "paid") {
         await showSuccess(statusData);
+      } else if (statusData.status === "failed") {
+        stopPolling();
+        redirectPaymentView.hidden = true;
+        restartButton.hidden = false;
+        $("#paymentWaitTitle").textContent = "Pagamento não concluído";
       }
     } catch (error) {
       paymentStatusMessage.textContent = error.message || "Não foi possível consultar o pagamento agora. Tentaremos novamente.";
@@ -392,6 +398,15 @@
   backButton.addEventListener("click", () => {
     setFormError("");
     showStage("contribution");
+  });
+
+  restartButton.addEventListener("click", () => {
+    stopPolling();
+    clearSession();
+    restartButton.hidden = true;
+    $("#paymentWaitTitle").textContent = "Aguardando confirmação";
+    showStage("contribution");
+    loadPaymentOptions();
   });
 
   $("#donorCpf")?.addEventListener("input", (event) => {

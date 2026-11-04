@@ -9,7 +9,7 @@ Configure no backend (Secret Manager em produção; `.env` apenas local):
 ```env
 STRIPE_SECRET_KEY=CHAVE_SECRETA_DA_SUA_CONTA_DE_TESTE
 STRIPE_WEBHOOK_SECRET=SEGREDO_DO_ENDPOINT_DE_TESTE
-STRIPE_API_VERSION=2026-09-30.endive
+STRIPE_API_VERSION=2026-10-28.endive
 PUBLIC_BASE_URL=http://localhost:8000
 ```
 
@@ -53,6 +53,17 @@ pytest -q
 node tests/frontend-static.test.js
 node tests/donation-steps.test.js
 ```
+
+Para validar também a API real e o Checkout hospedado, use o eval opt-in:
+
+```bash
+python -m pip install playwright
+python tools/stripe_eval.py
+```
+
+Requer Stripe CLI, Google Chrome instalado e chave `sk_test_...` ou `rk_test_...` em `backend/.env` ou no ambiente. A versão da API deve corresponder à usada por `stripe listen --latest`. O eval recusa chaves live, inicia aplicação e listener próprios, usa doador fictício e armazenamento temporário, e mantém emails desabilitados. Não precisa alterar o segredo de webhook local: o segredo da CLI vale somente no processo do eval.
+
+O eval verifica formulário, Pix, cartão pontual e mensal, recusa e nova tentativa, retorno sem confirmação, expiração, assinaturas válidas e adulteradas, reenvio de eventos e cadastro gravado uma vez após pagamento. Para verificar um segundo pagamento mensal, cria e paga outra fatura vinculada à assinatura; não simula a passagem de um mês. Ao terminar, cancela as assinaturas criadas e expira checkouts abertos. Os pagamentos e demais objetos de teste continuam no histórico da conta Stripe. Os testes de Firestore continuam separados, com `FIRESTORE_TEST_HOST` apontando para um emulador local, conforme o CI.
 
 Cada fatura paga recebe uma entrada em `recurring_payments.jsonl`, deduplicada pelo ID da fatura, inclusive após reinício. `payment_confirmations.jsonl` guarda a primeira confirmação da contribuição; `confirmed_donations.jsonl` grava os dados do doador uma vez, somente após pagamento. Renovações referenciam esse cadastro pelo `donation_id`, sem duplicar PII. Se a gravação falhar, o webhook retorna erro e pode ser reenviado; uma tentativa não é considerada concluída antes das gravações necessárias.
 

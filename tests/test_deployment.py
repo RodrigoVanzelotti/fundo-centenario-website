@@ -18,7 +18,10 @@ def test_static_hosting_artifact_and_api_boundary():
     assert not any(public.rglob("*.jsonl"))
     urls = ElementTree.parse(public / "sitemap.xml").findall("{*}url/{*}loc")
     assert {url.text for url in urls} == {
-        "https://fundocentenario.com.br/", "https://fundocentenario.com.br/como-apoiar/"}
+        "https://fundocentenario.com.br/", "https://fundocentenario.com.br/como-apoiar/",
+        "https://fundocentenario.com.br/quem-somos/", "https://fundocentenario.com.br/quem-apoia/",
+        "https://fundocentenario.com.br/projetos/", "https://fundocentenario.com.br/edital-de-projetos/",
+        "https://fundocentenario.com.br/programa-bolsa-de-permanencia/"}
     for path in (public / "index.html", public / "como-apoiar/index.html"):
         assert 'rel="canonical"' in path.read_text(encoding="utf-8")
     headers = {item["source"]: {header["key"]: header["value"] for header in item["headers"]}

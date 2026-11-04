@@ -60,7 +60,7 @@ class DonationIntentRequest(BaseModel):
     donor: DonorQuestionnaire
     program: DonationProgram
     method: Literal[PaymentMethod.PIX, PaymentMethod.CARD, PaymentMethod.CARD_RECURRING]
-    amount_cents: int = Field(strict=True, ge=100, le=100_000_000)
+    amount_cents: int = Field(strict=True, ge=100, le=99_999_999)
 
 
 class DonationFinalizeRequest(BaseModel):

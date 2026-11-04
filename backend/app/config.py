@@ -46,7 +46,7 @@ class Settings:
     pending_ttl_seconds: int = int(os.getenv("PENDING_TTL_SECONDS", str(30 * 24 * 60 * 60)))
     stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "")
     stripe_webhook_secret: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-    stripe_api_version: str = os.getenv("STRIPE_API_VERSION", "2026-09-30.endive")
+    stripe_api_version: str = os.getenv("STRIPE_API_VERSION", "2026-10-28.endive")
 
     email_enabled: bool = _bool("EMAIL_ENABLED", False)
     smtp_host: str = os.getenv("SMTP_HOST", "")

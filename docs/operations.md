@@ -17,17 +17,17 @@ por esta preparação):
 |---|---|---|
 | Indisponibilidade | Uptime HTTPS `/api/health`, 5 min; alerta após 2 falhas | Verificar revisão, startup e segredos; não usar ready no monitor contínuo |
 | 5xx | >=5 erros em 5 min ou razão >5% com >=20 requests | Inspecionar request_id e dependências; rollback se regressão |
-| Latência | p95 >5s por 10 min, avaliar tamanho da amostra | Conferir Stripe, Firestore e cold starts |
-| Abuso | Volume >100/min por 5 min ou >=10 respostas 429 | Investigar origem/PSP; limite global pode prejudicar doadores |
 | Scheduler | Falhas consecutivas e job atrasado >15 min | Conferir OIDC, audience e SMTP; manter outbox |
+| Stripe | Notificações de falha de entrega do webhook habilitadas | Conferir destino nativo Run, assinatura e reenvios |
 | Emails | Logs `Agradecimento pendente` | Revisar retries/leases; nunca copiar destinatários para incidentes públicos |
 | Dados | Firestore leituras/escritas/armazenamento; Hosting transferência; Run CPU/memória/instâncias | Revisão semanal no início, mensal após estabilização |
 
 Escolher responsável e canal de notificação e testar a entrega. Logs Explorer:
 `resource.type="cloud_run_revision" AND jsonPayload.message="request_failed"`.
 Criar métrica baseada no log `http_request` se precisar de rota normalizada. Revisar
-semanalmente idade/tamanho da outbox e confirmações sem cadastro, por operação
-administrativa restrita; não criar endpoint público para essas consultas.
+diariamente pagamentos versus cadastros e emails na primeira semana; depois,
+semanalmente, incluindo idade da outbox e confirmações sem cadastro, por operação
+administrativa restrita. Não criar endpoint público para essas consultas.
 Mínimo zero mantém cold starts; medir p95 real antes de aumentar instâncias.
 
 ## FinOps e estimativa
@@ -50,12 +50,14 @@ Hosting Blaze inclui 10 GB/mês de transferência, excedente documentado US$0,15
 diária, mas TTL, backups/PITR e restauração podem ser cobrados separadamente.
 Considerar Artifact Registry (retenção de imagens), Secret Manager, rede São Paulo,
 logs, Scheduler e dois ambientes. Estimativa de planejamento: **US$0–5/mês de GCP**
-nesse volume, sob franquias disponíveis e retenção moderada; reservar US$10 e revisar
-após uma semana e um mês. Não inclui Stripe, SMTP, domínio, Workspace, GitHub pago,
+nesse volume, sob franquias disponíveis e retenção moderada; o orçamento autorizado
+é R$60/mês, com revisão após uma semana e um mês. Não inclui Stripe, SMTP, domínio, Workspace, GitHub pago,
 impostos/câmbio ou grandes backups. Sem promessa de custo zero/créditos nonprofits.
 
-Criar orçamento **US$10/mês**, abrangendo ambos os projetos, alertas em **50%, 80%,
-100%** (e previsão). Orçamento e máximo 3 instâncias não suspendem cobranças. Usar
+Orçamento configurado e autorizado: **R$60/mês**, abrangendo ambos os projetos,
+alertas de gasto real em **50%, 80%, 100%**, canal institucional e destinatários
+padrão do faturamento. Não duplicar o orçamento. Orçamento e máximo 3 instâncias
+não suspendem cobranças. Usar
 cobrança Run por requisição (`--cpu-throttling`). Antes de criar o banco, conferir
 pricing de southamerica-east1; alternativa US exige revisão de residência/latência.
 
@@ -117,8 +119,10 @@ Não rotacionar hashes isoladamente: isso pode rejeitar renovações legítimas.
 procedimento ainda exige revisão institucional e ensaio; não há endpoint de exclusão
 automatizada no MVP. A política aprovada é um gate de lançamento.
 
-Habilitar backup gerenciado/PITR somente após aprovar custo e retenção. Restaurar
-em banco/projeto isolado, conferir contagens, IDs, primeira confirmação e deduplicação,
+Configurar backup diário gerenciado de produção com retenção de sete dias, sem PITR
+neste lançamento, conforme [procedimento principal](deployment.md#backup-e-ensaio-de-restauração).
+Ensaiar restauração com dados sintéticos em staging antes do live. Restaurar
+em banco separado, conferir contagens, IDs, primeira confirmação e deduplicação,
 reconciliar eventos Stripe recebidos após o backup, testar antes de trocar produção.
 RPO/RTO ainda dependem da política aprovada; sugestão para decisão: RPO 24h e RTO 4h,
 com reconciliação PSP. Backups sem restauração ensaiada não satisfazem o gate.

@@ -128,7 +128,7 @@ O Dockerfile inclui backend, template de email e frontend, roda como UID/GID `10
 
 No ambiente de produção, injete configurações e segredos em runtime pelo Secret Manager. Configure Stripe e a origem pública conforme [DEPLOYMENT.md](DEPLOYMENT.md). A porta é definida por `PORT`, com fallback local `8000`; TLS é terminado pela plataforma.
 
-No Cloud Run, use `STORAGE_BACKEND=firestore`, com projeto, identidade e banco privado. Não monte JSONL como persistência de produção. A imagem usa lock com hashes e base fixada por digest; o workflow implanta uma imagem testada por digest. Dados locais existentes exigem migração explícita e reconciliação.
+No Cloud Run, use `STORAGE_BACKEND=firestore`, com projeto, identidade e banco privado. Não monte JSONL como persistência de produção. A imagem usa lock com hashes e base fixada por digest; o workflow implanta uma imagem testada por digest. Neste lançamento, produção começa vazia, sem importar dados locais ou assinaturas anteriores; veja [o procedimento principal](docs/deployment.md).
 
 ## Testar pagamentos localmente
 

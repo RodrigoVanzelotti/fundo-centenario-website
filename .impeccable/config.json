@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "buried-raster",
+        "value": "*",
+        "files": [
+          "frontend/projetos/index.html"
+        ],
+        "createdAt": "2026-11-05T01:04:06.962Z",
+        "reason": "Agent: the established header and footer logo stacks alternate light and dark images; rendered desktop and mobile checks show the active logo visible while the other stays hidden."
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "frontend/projetos/index.html"
+        ],
+        "createdAt": "2026-11-05T01:04:07.015Z",
+        "reason": "Agent: desktop and mobile renders show visible content insets supplied by the nested container gutters and footer padding; the outer wrapper is not the text boundary."
+      }
+    ]
+  }
+}

@@ -37,6 +37,8 @@ Rotas do site:
 
 As páginas institucionais usam o tema compartilhado do site e conteúdo adaptado das referências oficiais: [Quem somos](https://www.fundocentenario.com.br/quem-somos), [Quem apoia](https://www.fundocentenario.com.br/quem-apoia) e [Projetos](https://www.fundocentenario.com.br/projetos). Edital de Projetos e Bolsas de Permanência possuem páginas locais. Edital, Bolsas e Quem somos usam uma coluna de leitura em fundo branco, títulos diretos e uma ação principal no conteúdo. Os programas apresentam elegibilidade, funcionamento e participação. Quem somos apresenta história, fundo patrimonial, governança e prestação de contas. Relatórios anteriores e resultados ficam em seções expansíveis. Apenas documentos e o formulário oficial de inscrição continuam externos. A página de bolsas direciona dúvidas sobre seleções para o email institucional, sem anunciar inscrições abertas. Os links estão disponíveis no cabeçalho e na página inicial. O CSS institucional usa `?v=` com os primeiros 12 caracteres do SHA-256 do arquivo para evitar versões antigas em cache. Ao editar esse CSS, atualize as referências nas páginas; o teste estático verifica essa correspondência.
 
+O arquivo `frontend/assets/css/institutional.css` usa finais de linha LF, fixados em `.gitattributes`, para que o hash de versão seja o mesmo em Windows e Linux.
+
 ## Métodos implementados
 
 1. **Pix pontual**: Checkout hospedado da Stripe apresenta o QR Code e o Pix Copia e Cola.
@@ -128,7 +130,7 @@ O Dockerfile inclui backend, template de email e frontend, roda como UID/GID `10
 
 No ambiente de produção, injete configurações e segredos em runtime pelo Secret Manager. Configure Stripe e a origem pública conforme [DEPLOYMENT.md](DEPLOYMENT.md). A porta é definida por `PORT`, com fallback local `8000`; TLS é terminado pela plataforma.
 
-No Cloud Run, use `STORAGE_BACKEND=firestore`, com projeto, identidade e banco privado. Não monte JSONL como persistência de produção. A imagem usa lock com hashes e base fixada por digest; o workflow implanta uma imagem testada por digest. Dados locais existentes exigem migração explícita e reconciliação.
+No Cloud Run, use `STORAGE_BACKEND=firestore`, com projeto, identidade e banco privado. Não monte JSONL como persistência de produção. A imagem usa lock com hashes e base fixada por digest; o workflow implanta uma imagem testada por digest. Neste lançamento, produção começa vazia, sem importar dados locais ou assinaturas anteriores; veja [o procedimento principal](docs/deployment.md).
 
 ## Testar pagamentos localmente
 

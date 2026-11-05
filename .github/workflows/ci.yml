@@ -43,6 +43,7 @@ jobs:
           python -m compileall -q backend tools
           python -m pytest -q
           node tests/frontend-static.test.js
+          node tests/institutional-static.test.js
           node tests/donation-steps.test.js
           cp backend/.env.example backend/.env
           docker compose config --quiet

@@ -204,6 +204,7 @@
 
 .program-card .eyebrow {
   margin-bottom: 8px;
+  color: var(--brand-blue);
 }
 
 .program-card p:not(.eyebrow) {

@@ -1,8 +1,9 @@
 # Migração Wix, DNS e domínio
 
-**Cutover bloqueado até inventário e preservação das páginas Wix.** Esta preparação
-não altera DNS. `frontend/` só contém `/` e `/como-apoiar/`; copiar o site atual
-inteiro ou inventar equivalências de conteúdo extrapola a preparação de infraestrutura.
+**Cutover depende de inventário e revisão das páginas e documentos Wix.** Esta
+preparação não altera DNS. `frontend/` já contém home, contribuição, Quem somos,
+Quem apoia, Projetos, Edital e Bolsas; confirmar cobertura editorial e documentos
+externos antes de mudar o domínio. O procedimento principal é [deploy](deployment.md).
 
 ## Evidências públicas de 16/10/2026
 
@@ -31,10 +32,11 @@ não substitui export do Wix e Search Console.
 | `/` | `/` | Implementado; revisão editorial pendente |
 | `/como-apoiar/` | `/como-apoiar/` | Implementado; validar checkout staging |
 | `/como-apoiar` | Normalização para diretório `/como-apoiar/` | Validar Hosting |
-| `/edital-de-projetos` | Preservar página/conteúdo e inscrições; destino a aprovar | Bloqueador |
-| `/programa-bolsa-de-permanencia` | Preservar elegibilidade/aplicação; destino a aprovar | Bloqueador |
-| `/quem-somos` | Preservar governança/relatórios; destino a aprovar | Bloqueador |
-| `/projetos` | Inventariar e preservar | Bloqueador |
+| `/edital-de-projetos` | Página local implementada; revisar conteúdo e inscrições | Revisão pendente |
+| `/programa-bolsa-de-permanencia` | Página local implementada; revisar elegibilidade e contato | Revisão pendente |
+| `/quem-somos` | Página local implementada; revisar governança e relatórios | Revisão pendente |
+| `/quem-apoia` | Página local implementada; revisar apoiadores | Revisão pendente |
+| `/projetos` | Página local implementada; revisar programas | Revisão pendente |
 | `/_files/ugd/*` | Exportar arquivos e mapear URLs, verificar links externos | Bloqueador |
 | Demais URLs Wix/Search Console | Exportar e classificar 200/301/410 | Pendente |
 
